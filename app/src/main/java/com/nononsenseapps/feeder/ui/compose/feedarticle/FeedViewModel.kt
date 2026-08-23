@@ -31,6 +31,7 @@ import com.nononsenseapps.feeder.model.PodcastPlayerState
 import com.nononsenseapps.feeder.model.PodcastPlayerStateHolder
 import com.nononsenseapps.feeder.model.TTSStateHolder
 import com.nononsenseapps.feeder.model.TranslationManager
+import com.nononsenseapps.feeder.openai.canSummarize
 import com.nononsenseapps.feeder.openai.canUseAsTranslationApi
 import com.nononsenseapps.feeder.openai.isLocalTranslation
 import com.nononsenseapps.feeder.ui.compose.feed.FeedListItem
@@ -75,6 +76,11 @@ class FeedViewModel(
         repository
             .getCurrentFeedListItems()
             .cachedIn(viewModelScope)
+
+    val canSummarize: StateFlow<Boolean> =
+        repository.openAISettings
+            .map { it.canSummarize }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, repository.openAISettings.value.canSummarize)
 
     private val translatedFeedCardEntries = MutableStateFlow<Map<FeedCardSource, FeedCardTranslationEntry>>(emptyMap())
     private val feedCardTranslationGeneration = MutableStateFlow(0)

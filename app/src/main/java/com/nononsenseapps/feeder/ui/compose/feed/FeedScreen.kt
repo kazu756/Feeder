@@ -40,6 +40,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
@@ -144,6 +145,7 @@ import com.nononsenseapps.feeder.ui.compose.navigation.EditFeedDestination
 import com.nononsenseapps.feeder.ui.compose.navigation.FeedDestination
 import com.nononsenseapps.feeder.ui.compose.navigation.SearchFeedDestination
 import com.nononsenseapps.feeder.ui.compose.navigation.SettingsDestination
+import com.nononsenseapps.feeder.ui.compose.navigation.UnreadDigestDestination
 import com.nononsenseapps.feeder.ui.compose.pullrefresh.PullRefreshIndicator
 import com.nononsenseapps.feeder.ui.compose.pullrefresh.pullRefresh
 import com.nononsenseapps.feeder.ui.compose.pullrefresh.rememberPullRefreshState
@@ -180,6 +182,7 @@ fun FeedScreen(
 ) {
     val toastMaker: ToastMaker by instance()
     val viewState: FeedScreenViewState by viewModel.viewState.collectAsStateWithLifecycle()
+    val canSummarize by viewModel.canSummarize.collectAsStateWithLifecycle()
     val translatedFeedCards by viewModel.translatedFeedCards.collectAsStateWithLifecycle()
     val pagedFeedItems = viewModel.currentFeedListItems.collectAsLazyPagingItems()
     val pagedNavDrawerItems = viewModel.pagedNavDrawerItems.collectAsLazyPagingItems()
@@ -353,6 +356,8 @@ fun FeedScreen(
             onSettings = {
                 SettingsDestination.navigate(navController)
             },
+            onUnreadDigest = { UnreadDigestDestination.navigate(navController) },
+            canSummarize = canSummarize,
             onImport = {
                 try {
                     opmlImporter.launch(
@@ -546,6 +551,8 @@ fun FeedScreen(
     onShowRenameTagDialog: () -> Unit,
     onDismissRenameTagDialog: () -> Unit,
     onSettings: () -> Unit,
+    onUnreadDigest: () -> Unit,
+    canSummarize: Boolean,
     onImport: () -> Unit,
     onExportOPML: () -> Unit,
     onImportSavedArticles: () -> Unit,
@@ -838,6 +845,17 @@ fun FeedScreen(
                                     onShowToolbarMenu(false)
                                 },
                         ) {
+                            if (canSummarize) {
+                                DropdownMenuItem(
+                                    onClick = {
+                                        onShowToolbarMenu(false)
+                                        onUnreadDigest()
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                                    text = { Text(stringResource(R.string.unread_ai_digest)) },
+                                )
+                                HorizontalDivider()
+                            }
                             DropdownMenuItem(
                                 onClick = {
                                     onMarkAllAsRead()

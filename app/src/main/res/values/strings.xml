@@ -402,4 +402,9 @@
   <string name="widget_title">Feeder</string>
   <string name="widget_refreshing">Refreshing</string>
   <string name="force_single_column">Force single column</string>
+  <string name="unread_ai_digest">Unread AI digest</string>
+  <string name="creating_unread_digest">Organizing unread articles…</string>
+  <string name="no_unread_articles">There are no unread articles</string>
+  <string name="retry">Retry</string>
+  <string name="open_recommended_articles">Open recommended articles</string>
 </resources>

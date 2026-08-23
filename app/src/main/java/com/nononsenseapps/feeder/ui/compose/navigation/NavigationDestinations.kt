@@ -36,6 +36,7 @@ import com.nononsenseapps.feeder.ui.compose.settings.TextSettingsScreen
 import com.nononsenseapps.feeder.ui.compose.settings.TextSettingsViewModel
 import com.nononsenseapps.feeder.ui.compose.sync.SyncScreen
 import com.nononsenseapps.feeder.ui.compose.sync.SyncScreenViewModel
+import com.nononsenseapps.feeder.ui.compose.unreaddigest.UnreadDigestScreen
 import com.nononsenseapps.feeder.util.DEEP_LINK_BASE_URI
 import com.nononsenseapps.feeder.util.logDebug
 
@@ -488,6 +489,30 @@ data object ArticleDestination : NavigationDestination(
             },
             viewModel = backStackEntry.diAwareViewModel(),
             mainActivityViewModel = mainActivityViewModel,
+        )
+    }
+}
+
+data object UnreadDigestDestination : NavigationDestination(
+    path = "unread-digest",
+    navArguments = emptyList(),
+    deepLinks = emptyList(),
+) {
+    fun navigate(navController: NavController) {
+        navController.navigate(path) { launchSingleTop = true }
+    }
+
+    @Composable
+    override fun RegisterScreen(
+        navController: NavController,
+        backStackEntry: NavBackStackEntry,
+        navDrawerListState: LazyListState,
+        mainActivityViewModel: MainActivityViewModel,
+    ) {
+        UnreadDigestScreen(
+            onNavigateUp = { navController.popBackStack() },
+            onOpenArticle = { itemId -> ArticleDestination.navigate(navController, itemId) },
+            viewModel = backStackEntry.diAwareViewModel(),
         )
     }
 }

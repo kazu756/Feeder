@@ -3,6 +3,7 @@ package com.nononsenseapps.feeder.archmodel
 import com.nononsenseapps.feeder.db.room.FeedItemDao
 import com.nononsenseapps.feeder.db.room.FeedItemIdWithLink
 import com.nononsenseapps.feeder.db.room.FeedItemWithFeed
+import com.nononsenseapps.feeder.model.PreviewItem
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -94,6 +95,18 @@ class FeedItemStoreTest : DIAware {
             }
 
         assertEquals(5L, feedItem?.id)
+    }
+
+    @Test
+    fun getUnreadDigestPreviewsIsReadOnlyPassThrough() {
+        val expected = listOf(PreviewItem(id = 5L, plainTitle = "Title", plainSnippet = "Snippet"))
+        coEvery { dao.getUnreadDigestPreviews() } returns expected
+
+        val actual = runBlocking { store.getUnreadDigestPreviews() }
+
+        assertEquals(expected, actual)
+        coVerify(exactly = 1) { dao.getUnreadDigestPreviews() }
+        coVerify(exactly = 0) { dao.markAsReadAndNotified(any(), any()) }
     }
 
     @Test

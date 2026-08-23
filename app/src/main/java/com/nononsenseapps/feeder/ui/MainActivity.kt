@@ -27,6 +27,7 @@ import com.nononsenseapps.feeder.ui.compose.navigation.SearchFeedDestination
 import com.nononsenseapps.feeder.ui.compose.navigation.SettingsDestination
 import com.nononsenseapps.feeder.ui.compose.navigation.SyncScreenDestination
 import com.nononsenseapps.feeder.ui.compose.navigation.TextSettingsDestination
+import com.nononsenseapps.feeder.ui.compose.navigation.UnreadDigestDestination
 import com.nononsenseapps.feeder.ui.compose.utils.withAllProviders
 import kotlinx.coroutines.launch
 import org.kodein.di.instance
@@ -110,6 +111,7 @@ class MainActivity : DIAwareComponentActivity() {
         NavHost(navController, startDestination = FeedDestination.route) {
             FeedDestination.register(this, navController, navDrawerListState, mainActivityViewModel)
             ArticleDestination.register(this, navController, navDrawerListState, mainActivityViewModel)
+            UnreadDigestDestination.register(this, navController, navDrawerListState, mainActivityViewModel)
             // Feed editing
             EditFeedDestination.register(this, navController, navDrawerListState, mainActivityViewModel)
             SearchFeedDestination.register(this, navController, navDrawerListState, mainActivityViewModel)

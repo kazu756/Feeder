@@ -25,6 +25,7 @@ import com.nononsenseapps.feeder.db.room.RemoteFeed
 import com.nononsenseapps.feeder.db.room.SyncDevice
 import com.nononsenseapps.feeder.db.room.SyncRemote
 import com.nononsenseapps.feeder.model.FeedUnreadCount
+import com.nononsenseapps.feeder.model.PreviewItem
 import com.nononsenseapps.feeder.model.ThumbnailImage
 import com.nononsenseapps.feeder.sync.DeviceListResponse
 import com.nononsenseapps.feeder.sync.ErrorResponse
@@ -359,6 +360,8 @@ class Repository(
     }
 
     val openAISettings = settingsStore.openAiSettings
+
+    suspend fun getUnreadDigestPreviews(): List<PreviewItem> = feedItemStore.getUnreadDigestPreviews()
 
     fun setOpenAiSettings(value: OpenAISettings) = settingsStore.setOpenAiSettings(value)
 

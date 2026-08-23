@@ -164,6 +164,19 @@ interface FeedItemDao {
         SELECT $PREVIEW_COLUMNS
         FROM feed_items
         LEFT JOIN feeds ON feed_items.feed_id = feeds.id
+        WHERE read_time IS NULL
+          AND block_time IS NULL
+        ORDER BY $FEED_ITEM_LIST_SORT_ORDER_DESC
+        LIMIT 50
+        """,
+    )
+    suspend fun getUnreadDigestPreviews(): List<PreviewItem>
+
+    @Query(
+        """
+        SELECT $PREVIEW_COLUMNS
+        FROM feed_items
+        LEFT JOIN feeds ON feed_items.feed_id = feeds.id
         WHERE feed_id IS :feedId
           AND block_time IS NULL
         ORDER BY $FEED_ITEM_LIST_SORT_ORDER_DESC
