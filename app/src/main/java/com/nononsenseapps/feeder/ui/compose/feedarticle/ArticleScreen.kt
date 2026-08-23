@@ -55,6 +55,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -113,6 +114,8 @@ fun ArticleScreen(
 
     val mavm = remember { mainActivityViewModel }
     val viewState by viewModel.viewState.collectAsStateWithLifecycle()
+    val isPullFullTextLoading by viewModel.isPullFullTextLoading.collectAsStateWithLifecycle()
+    val isDisplayingFullText by viewModel.isDisplayingFullText.collectAsStateWithLifecycle()
     val isPagingMode by mavm.isPagingMode.collectAsStateWithLifecycle()
     val isAnimatedPaging by mavm.isAnimatedPaging.collectAsStateWithLifecycle()
 
@@ -155,6 +158,7 @@ fun ArticleScreen(
     ArticleScreen(
         viewState = viewState,
         onToggleFullText = viewModel::toggleFullText,
+        onRequestFullText = viewModel::requestFullTextFromPull,
         onMarkAsUnread = viewModel::markAsUnread,
         onShare = {
             if (viewState.articleId > ID_UNSET) {
@@ -222,6 +226,8 @@ fun ArticleScreen(
         modifier = modifier,
         isPagingMode = isPagingMode,
         isAnimatedPaging = isAnimatedPaging,
+        isPullFullTextLoading = isPullFullTextLoading,
+        isDisplayingFullText = isDisplayingFullText,
     )
 }
 
@@ -232,6 +238,7 @@ fun ArticleScreen(
 fun ArticleScreen(
     viewState: ArticleScreenViewState,
     onToggleFullText: () -> Unit,
+    onRequestFullText: () -> Unit,
     onMarkAsUnread: () -> Unit,
     onShare: () -> Unit,
     onOpenInCustomTab: () -> Unit,
@@ -259,6 +266,8 @@ fun ArticleScreen(
     modifier: Modifier = Modifier,
     isPagingMode: Boolean = false,
     isAnimatedPaging: Boolean = false,
+    isPullFullTextLoading: Boolean = false,
+    isDisplayingFullText: Boolean = false,
 ) {
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
@@ -508,6 +517,10 @@ fun ArticleScreen(
                     .padding(padding),
         ) {
             val coroutineScope = rememberCoroutineScope()
+            val edgePullState =
+                rememberArticleEdgePullState(
+                    isRequestingFullText = isPullFullTextLoading,
+                )
             ArticleContent(
                 viewState = viewState,
                 screenType = ScreenType.SINGLE,
@@ -517,11 +530,30 @@ fun ArticleScreen(
                 onOpenInCustomTab = onOpenInCustomTab,
                 modifier =
                     Modifier
-                        .focusGroup()
+                        .articleEdgePull(
+                            state = edgePullState,
+                            canPullFromTop = { !articleScrollState.canScrollBackward },
+                            canPullFromBottom = { !articleScrollState.canScrollForward },
+                            topEnabled = !isDisplayingFullText && !isPullFullTextLoading,
+                            bottomEnabled = !viewState.articleLink.isNullOrBlank(),
+                            onRequestFullText = onRequestFullText,
+                            onOpenWebPage = onOpenInCustomTab,
+                        ).focusGroup()
                         .focusRequester(focusArticle)
                         .focusProperties {
                             up = focusTopBar
                         },
+            )
+
+            ArticleEdgePullIndicator(
+                state = edgePullState,
+                direction = ArticleEdgePullDirection.Top,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+            ArticleEdgePullIndicator(
+                state = edgePullState,
+                direction = ArticleEdgePullDirection.Bottom,
+                modifier = Modifier.align(Alignment.BottomCenter),
             )
 
             if (isPagingMode) {

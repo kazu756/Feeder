@@ -58,6 +58,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
@@ -109,6 +110,17 @@ class ArticleViewModel(
 
     private val textToDisplay = MutableStateFlow(TextToDisplay.CONTENT)
     private val displayFullTextOverride = MutableStateFlow<Boolean?>(null)
+    private val _isPullFullTextLoading = MutableStateFlow(false)
+    val isPullFullTextLoading = _isPullFullTextLoading.asStateFlow()
+
+    val isDisplayingFullText: StateFlow<Boolean> =
+        combine(articleFlow, displayFullTextOverride) { article, override ->
+            override ?: article?.fullTextByDefault ?: false
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false,
+        )
 
     private val articleContentFlow: StateFlow<LinearArticle> =
         combine(
@@ -324,6 +336,36 @@ class ArticleViewModel(
             translateCurrentArticle()
         }
     }
+
+    fun requestFullTextFromPull() {
+        if (isFullText || !_isPullFullTextLoading.compareAndSet(expect = false, update = true)) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (isFullText) return@launch
+                val error = retrieveFullText(itemId).leftOrNull()
+                if (error == null) {
+                    displayFullTextOverride.value = true
+                    if (showTranslatedContent.value) {
+                        translateCurrentArticle()
+                    }
+                } else {
+                    toastMaker.makeToast(error.fullTextErrorStringResource())
+                }
+            } finally {
+                _isPullFullTextLoading.value = false
+            }
+        }
+    }
+
+    private fun FeedParserError.fullTextErrorStringResource(): Int =
+        when (this) {
+            is NoBody -> R.string.failed_to_fetch_full_article_missing_body
+            is NoUrl -> R.string.failed_to_fetch_full_article_missing_link
+            is UnsupportedContentType, is NotHTML -> R.string.failed_to_fetch_full_article_not_html
+            is FullTextTooLarge -> R.string.failed_to_fetch_full_article_too_large
+            else -> R.string.failed_to_fetch_full_article
+        }
 
     private suspend fun parseArticleContent(
         article: Article,

@@ -157,6 +157,11 @@
   <string name="failed_to_open_article">Could not open article</string>
   <string name="sync_to_fetch">Synchronize to fetch article</string>
   <string name="fetching_full_article">Fetching full article…</string>
+  <string name="edge_pull_pull_to_fetch_full_article">Pull further to fetch full article</string>
+  <string name="edge_pull_release_to_fetch_full_article">Release to fetch full article</string>
+  <string name="edge_pull_fetching_full_article">Fetching full article…</string>
+  <string name="edge_pull_pull_to_open_web_page">Pull further to open web page</string>
+  <string name="edge_pull_release_to_open_web_page">Release to open web page</string>
   <string name="failed_to_load_text_to_speech">Could not load text to speech</string>
   <string name="go_back">Go back</string>
   <string name="open_menu">Open menu</string>
