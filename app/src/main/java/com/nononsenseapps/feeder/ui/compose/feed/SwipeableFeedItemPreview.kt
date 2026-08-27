@@ -169,7 +169,7 @@ fun SwipeableFeedItemPreview(
                 .clip(
                     shape =
                         when (feedItemStyle) {
-                            FeedItemStyle.COMPACT, FeedItemStyle.SUPER_COMPACT -> RectangleShape
+                            FeedItemStyle.MAGAZINE, FeedItemStyle.COMPACT, FeedItemStyle.SUPER_COMPACT -> RectangleShape
                             else -> MaterialTheme.shapes.medium
                         },
                 ).combinedClickable(
@@ -327,6 +327,38 @@ fun SwipeableFeedItemPreview(
                             FeedItemEvent.DismissDropdown -> {
                                 dropDownMenuExpanded = false
                             }
+                            FeedItemEvent.OpenInReader -> onOpenFeedItemInReader()
+                            FeedItemEvent.OpenInCustomTab -> onOpenFeedItemInCustomTab()
+                            FeedItemEvent.OpenInBrowser -> onOpenFeedItemInBrowser()
+                            FeedItemEvent.MarkAboveAsRead -> onMarkAboveAsRead()
+                            FeedItemEvent.MarkBelowAsRead -> onMarkBelowAsRead()
+                            FeedItemEvent.ShareItem -> onShareItem()
+                            FeedItemEvent.ToggleBookmarked -> onToggleBookmark()
+                        }
+                    },
+                )
+            }
+
+            FeedItemStyle.MAGAZINE -> {
+                FeedItemMagazine(
+                    state =
+                        FeedItemState(
+                            item = item,
+                            showThumbnail = showThumbnail,
+                            dropDownMenuExpanded = dropDownMenuExpanded,
+                            bookmarkIndicator = bookmarkIndicator,
+                        ),
+                    modifier =
+                        Modifier.offset {
+                            try {
+                                IntOffset(anchoredDraggableState.requireOffset().roundToInt(), 0)
+                            } catch (_: IllegalStateException) {
+                                IntOffset(0, 0)
+                            }
+                        },
+                    onEvent = { event ->
+                        when (event) {
+                            FeedItemEvent.DismissDropdown -> dropDownMenuExpanded = false
                             FeedItemEvent.OpenInReader -> onOpenFeedItemInReader()
                             FeedItemEvent.OpenInCustomTab -> onOpenFeedItemInCustomTab()
                             FeedItemEvent.OpenInBrowser -> onOpenFeedItemInBrowser()

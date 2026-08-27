@@ -1419,6 +1419,7 @@ fun FeedListContent(
             when (viewState.feedItemStyle) {
                 FeedItemStyle.CARD -> Arrangement.spacedBy(LocalDimens.current.margin)
                 FeedItemStyle.COMPACT_CARD -> Arrangement.spacedBy(LocalDimens.current.margin)
+                FeedItemStyle.MAGAZINE -> Arrangement.spacedBy(0.dp)
                 FeedItemStyle.COMPACT -> Arrangement.spacedBy(0.dp)
                 FeedItemStyle.SUPER_COMPACT -> Arrangement.spacedBy(0.dp)
             }
@@ -1444,7 +1445,7 @@ fun FeedListContent(
                                     FeedItemStyle.CARD -> addMargin(horizontal = LocalDimens.current.margin)
                                     FeedItemStyle.COMPACT_CARD -> addMargin(horizontal = LocalDimens.current.margin)
                                     // No margin since dividers
-                                    FeedItemStyle.COMPACT, FeedItemStyle.SUPER_COMPACT -> this
+                                    FeedItemStyle.MAGAZINE, FeedItemStyle.COMPACT, FeedItemStyle.SUPER_COMPACT -> this
                                 }
                             }.asPaddingValues()
                     },
@@ -1684,6 +1685,7 @@ fun FeedGridContent(
             when (viewState.feedItemStyle) {
                 FeedItemStyle.CARD -> Arrangement.spacedBy(LocalDimens.current.gutter)
                 FeedItemStyle.COMPACT_CARD -> Arrangement.spacedBy(LocalDimens.current.gutter)
+                FeedItemStyle.MAGAZINE -> Arrangement.spacedBy(LocalDimens.current.gutter)
                 FeedItemStyle.COMPACT -> Arrangement.spacedBy(LocalDimens.current.gutter)
                 FeedItemStyle.SUPER_COMPACT -> Arrangement.spacedBy(LocalDimens.current.gutter)
             }

@@ -268,6 +268,24 @@ class SettingsStoreTest : DIAware {
     }
 
     @Test
+    fun magazineFeedItemStyleSet() {
+        store.setFeedItemStyle(FeedItemStyle.MAGAZINE)
+
+        verify {
+            sp.edit().putString(PREF_FEED_ITEM_STYLE, "MAGAZINE").apply()
+        }
+
+        assertEquals(FeedItemStyle.MAGAZINE, store.feedItemStyle.value)
+    }
+
+    @Test
+    fun magazineFeedItemStyleRestored() {
+        every { sp.getString(PREF_FEED_ITEM_STYLE, FeedItemStyle.CARD.name) } returns FeedItemStyle.MAGAZINE.name
+
+        assertEquals(FeedItemStyle.MAGAZINE, store.feedItemStyle.value)
+    }
+
+    @Test
     fun useDetectLanguage() {
         store.setUseDetectLanguage(false)
         verify {
