@@ -53,8 +53,11 @@ import com.nononsenseapps.feeder.ui.text.MarkdownToHtmlConverter
 import com.nononsenseapps.feeder.util.Either
 import com.nononsenseapps.feeder.util.FilePathProvider
 import com.nononsenseapps.feeder.util.ToastMaker
+import com.nononsenseapps.feeder.util.articleBaseUrl
 import com.nononsenseapps.feeder.util.logDebug
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -144,6 +147,9 @@ class ArticleViewModel(
     private val showTranslatedContent = MutableStateFlow(false)
     private val translatedArticleContent = MutableStateFlow(LinearArticle(emptyList()))
     private val articleTranslationState = MutableStateFlow<ArticleTranslationState>(ArticleTranslationState.Empty)
+    private val standardTranslationLoading = MutableStateFlow(false)
+    private val aiTranslationLoading = MutableStateFlow(false)
+    private var aiTranslationJob: Job? = null
     private var handledInitialOpenActions = false
 
     fun saveScrollPosition(pos: Int) {
@@ -173,6 +179,8 @@ class ArticleViewModel(
             bergamotModelManager.downloadProgress,
             podcastPlayerStateHolder.playerState,
             repository.useInAppAudioPlayer,
+            standardTranslationLoading,
+            aiTranslationLoading,
         ) { params ->
             val article = params[0] as Article?
             val textToDisplay = params[1] as TextToDisplay
@@ -195,6 +203,9 @@ class ArticleViewModel(
             val translationDownloadProgress = params[15] as BergamotModelDownloadProgress?
             val podcastPlayerState = params[16] as PodcastPlayerState
             val useInAppAudioPlayer = params[17] as Boolean
+            val standardTranslationLoading = params[18] as Boolean
+            val aiTranslationLoading = params[19] as Boolean
+            val translationOperationLoading = standardTranslationLoading || aiTranslationLoading
             val currentTranslation =
                 (translationState as? ArticleTranslationState.Result)
                     ?.takeIf { it.isFullText == isFullText }
@@ -236,9 +247,20 @@ class ArticleViewModel(
                 image = article?.image,
                 showSummarize = summarySettings.canSummarize && !article?.link.isNullOrEmpty(),
                 openAiSummary = openAiSummary,
-                showTranslate = isShowingTranslated || (canRequestTranslation && alreadyInPreferredLanguage == null),
+                showTranslate =
+                    shouldShowStandardTranslationAction(
+                        canTranslate = isShowingTranslated || (canRequestTranslation && alreadyInPreferredLanguage == null),
+                        translationOperationLoading = translationOperationLoading,
+                    ),
+                showTranslateWithAi =
+                    shouldShowAiTranslationAction(
+                        canSummarize = summarySettings.canSummarize,
+                        hasArticleLink = !article?.link.isNullOrEmpty(),
+                        translationOperationLoading = translationOperationLoading,
+                    ),
                 isShowingTranslated = isShowingTranslated,
-                isTranslationLoading = translationState is ArticleTranslationState.Loading,
+                isTranslationLoading = translationOperationLoading,
+                isAiTranslationLoading = aiTranslationLoading,
                 translationModelDownloadProgress = translationDownloadProgress,
                 translationSourceLanguage = currentTranslation?.sourceLanguage ?: alreadyInPreferredLanguage?.sourceLanguage.orEmpty(),
                 systemTranslationSettingsMessage =
@@ -372,6 +394,7 @@ class ArticleViewModel(
         fullText: Boolean,
     ): LinearArticle {
         logDebug(LOG_TAG, "parseArticleContent(${article.id}, $fullText)")
+        val contentBaseUrl = articleBaseUrl(article.link, article.feedUrl)
         return try {
             withContext(Dispatchers.IO) {
                 val htmlLinearizer =
@@ -388,7 +411,7 @@ class ArticleViewModel(
                                     .use {
                                         htmlLinearizer.linearize(
                                             inputStream = it,
-                                            baseUrl = article.feedUrl ?: "",
+                                            baseUrl = contentBaseUrl,
                                         )
                                     }.also {
                                         textToDisplay.update { TextToDisplay.CONTENT }
@@ -415,7 +438,7 @@ class ArticleViewModel(
                                     "see <a href=\"https://github.com/spacecowboy/Feeder/issues/443\">feeder#443</a> " +
                                     "for updates on this issue<br/><br/>" +
                                     article.snippet,
-                                article.feedUrl ?: "",
+                                contentBaseUrl,
                             )
                         }
                     }
@@ -444,7 +467,7 @@ class ArticleViewModel(
                                     .use {
                                         htmlLinearizer.linearize(
                                             inputStream = it,
-                                            baseUrl = article.feedUrl ?: "",
+                                            baseUrl = contentBaseUrl,
                                         )
                                     }.also {
                                         textToDisplay.update { TextToDisplay.CONTENT }
@@ -641,6 +664,9 @@ class ArticleViewModel(
     }
 
     fun translate() {
+        if (aiTranslationLoading.value || standardTranslationLoading.value) {
+            return
+        }
         if (showTranslatedContent.value) {
             showTranslatedContent.value = false
             return
@@ -650,6 +676,10 @@ class ArticleViewModel(
     }
 
     private fun translateCurrentArticle() {
+        if (aiTranslationLoading.value || standardTranslationLoading.value) {
+            return
+        }
+        standardTranslationLoading.value = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val targetLanguage = repository.preferredTranslationLanguage.value.trim()
@@ -681,7 +711,7 @@ class ArticleViewModel(
                     return@launch
                 }
 
-                articleTranslationState.value = ArticleTranslationState.Loading
+                articleTranslationState.value = ArticleTranslationState.Loading()
                 val translation =
                     translationManager.getOrTranslateArticle(
                         itemId = article.id,
@@ -697,7 +727,7 @@ class ArticleViewModel(
                         articleLink = article.link ?: "",
                     ).linearize(
                         translation.translatedHtml,
-                        article.feedUrl ?: "",
+                        articleBaseUrl(article.link, article.feedUrl),
                     )
                 articleTranslationState.value =
                     ArticleTranslationState.Result(
@@ -715,8 +745,65 @@ class ArticleViewModel(
             } catch (e: Exception) {
                 clearTranslatedContent()
                 toastMaker.makeToast(e.message ?: "Translation failed")
+            } finally {
+                standardTranslationLoading.value = false
             }
         }
+    }
+
+    fun translateWithAi() {
+        if (
+            aiTranslationJob?.isActive == true ||
+            aiTranslationLoading.value ||
+            standardTranslationLoading.value
+        ) {
+            return
+        }
+        aiTranslationLoading.value = true
+        aiTranslationJob =
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val settings = repository.openAISettings.value
+                    if (!settings.canSummarize) {
+                        return@launch
+                    }
+                    val article = articleFlow.value ?: return@launch
+                    val fullText = isFullText
+                    val html = loadArticleHtml(article, fullText)
+                    val translation =
+                        translationManager.getOrTranslateArticleWithAi(
+                            itemId = article.id,
+                            title = article.title,
+                            html = html,
+                            isFullText = fullText,
+                            settings = settings,
+                        ) ?: throw IllegalStateException("AI translation failed")
+
+                    translatedArticleContent.value =
+                        HtmlLinearizer(
+                            tooLargeText = application.getString(R.string.failed_to_fetch_full_article_too_large),
+                            openInBrowserText = application.getString(R.string.open_in_web_view),
+                            articleLink = article.link ?: "",
+                        ).linearize(
+                            translation.translatedHtml,
+                            articleBaseUrl(article.link, article.feedUrl),
+                        )
+                    articleTranslationState.value =
+                        ArticleTranslationState.Result(
+                            translatedTitle = translation.translatedTitle,
+                            sourceLanguage = translation.sourceLanguage,
+                            isFullText = fullText,
+                        )
+                    showTranslatedContent.value = true
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    toastMaker.makeToast(e.message ?: "AI translation failed")
+                } finally {
+                    aiTranslationLoading.value = false
+                    aiTranslationJob = null
+                }
+            }
     }
 
     private suspend fun canStartAutomaticArticleTranslation(article: Article): Boolean {
@@ -916,6 +1003,17 @@ class ArticleViewModel(
     }
 }
 
+internal fun shouldShowStandardTranslationAction(
+    canTranslate: Boolean,
+    translationOperationLoading: Boolean,
+): Boolean = canTranslate && !translationOperationLoading
+
+internal fun shouldShowAiTranslationAction(
+    canSummarize: Boolean,
+    hasArticleLink: Boolean,
+    translationOperationLoading: Boolean,
+): Boolean = canSummarize && hasArticleLink && !translationOperationLoading
+
 private data class ArticleState(
     override val useDetectLanguage: Boolean = false,
     override val isBottomBarVisible: Boolean = false,
@@ -942,8 +1040,10 @@ private data class ArticleState(
     override val showSummarize: Boolean = false,
     override val openAiSummary: OpenAISummaryState = OpenAISummaryState.Empty,
     override val showTranslate: Boolean = false,
+    override val showTranslateWithAi: Boolean = false,
     override val isShowingTranslated: Boolean = false,
     override val isTranslationLoading: Boolean = false,
+    override val isAiTranslationLoading: Boolean = false,
     override val translationModelDownloadProgress: BergamotModelDownloadProgress? = null,
     override val translationSourceLanguage: String = "",
     override val systemTranslationSettingsMessage: String = "",
@@ -977,8 +1077,10 @@ interface ArticleScreenViewState {
     val showSummarize: Boolean
     val openAiSummary: OpenAISummaryState
     val showTranslate: Boolean
+    val showTranslateWithAi: Boolean
     val isShowingTranslated: Boolean
     val isTranslationLoading: Boolean
+    val isAiTranslationLoading: Boolean
     val translationModelDownloadProgress: BergamotModelDownloadProgress?
     val translationSourceLanguage: String
     val systemTranslationSettingsMessage: String
@@ -999,7 +1101,9 @@ sealed interface OpenAISummaryState {
 sealed interface ArticleTranslationState {
     data object Empty : ArticleTranslationState
 
-    data object Loading : ArticleTranslationState
+    data class Loading(
+        val isAi: Boolean = false,
+    ) : ArticleTranslationState
 
     data class AlreadyInPreferredLanguage(
         val sourceLanguage: String,

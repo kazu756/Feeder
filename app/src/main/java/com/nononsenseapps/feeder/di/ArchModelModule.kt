@@ -18,6 +18,7 @@ import com.nononsenseapps.feeder.localtranslation.LocalTranslator
 import com.nononsenseapps.feeder.model.OPMLParserHandler
 import com.nononsenseapps.feeder.model.TranslationManager
 import com.nononsenseapps.feeder.model.opml.OPMLImporter
+import com.nononsenseapps.feeder.openai.AiArticleTranslator
 import com.nononsenseapps.feeder.openai.OpenAIApi
 import com.nononsenseapps.feeder.openai.OpenAIClient
 import com.nononsenseapps.feeder.openai.OpenAIClientDefault
@@ -59,6 +60,7 @@ val archModelModule =
         bind<TranslationManager>() with singleton { TranslationManager(di) }
         bindFactory<OpenAISettings, OpenAIClient> { settings -> OpenAIClientDefault(settings) }
         bind<OpenAIApi>() with singleton { OpenAIApi(appLang = Locale.getDefault().getISO3Language(), factory()) }
+        bind<AiArticleTranslator>() with singleton { AiArticleTranslator(instance()) }
         bind<SuggestedFeedRepository>() with
             singleton {
                 SuggestedFeedRepository(

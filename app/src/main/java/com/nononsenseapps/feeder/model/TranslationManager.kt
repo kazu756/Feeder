@@ -5,9 +5,11 @@ import com.nononsenseapps.feeder.archmodel.OpenAISettings
 import com.nononsenseapps.feeder.archmodel.Repository
 import com.nononsenseapps.feeder.archmodel.TranslationApiSettings
 import com.nononsenseapps.feeder.localtranslation.LocalTranslator
+import com.nononsenseapps.feeder.openai.AiArticleTranslator
 import com.nononsenseapps.feeder.openai.OpenAIApi
 import com.nononsenseapps.feeder.openai.OpenAIApi.TranslationResult
 import com.nononsenseapps.feeder.openai.OpenAIApi.TranslationResult.ErrorAction
+import com.nononsenseapps.feeder.openai.canSummarize
 import com.nononsenseapps.feeder.openai.canTranslate
 import com.nononsenseapps.feeder.openai.canUseAsTranslationApi
 import com.nononsenseapps.feeder.openai.isDeepL
@@ -32,6 +34,7 @@ class TranslationManager(
     private val application: Application by instance()
     private val repository: Repository by instance()
     private val openAIApi: OpenAIApi by instance()
+    private val aiArticleTranslator: AiArticleTranslator by instance()
     private val localTranslator: LocalTranslator by instance()
     private val filePathProvider: FilePathProvider by instance()
     private val json =
@@ -376,6 +379,49 @@ class TranslationManager(
             )
         }
 
+    suspend fun getOrTranslateArticleWithAi(
+        itemId: Long,
+        title: String,
+        html: String,
+        isFullText: Boolean,
+        settings: OpenAISettings,
+    ): ArticleTranslation? =
+        withContext(Dispatchers.IO) {
+            if (!settings.canSummarize || html.isBlank()) {
+                return@withContext null
+            }
+
+            val cache = loadCache(itemId, settings, AI_TARGET_LANGUAGE, AI_CACHE_PROVIDER)
+            val titleHash = sha256(title)
+            val htmlHash = sha256(html)
+            val cachedHtml =
+                if (isFullText) {
+                    cache.translatedFullArticleHtml.takeIf { cache.fullArticleHtmlHash == htmlHash }
+                } else {
+                    cache.translatedArticleHtml.takeIf { cache.articleHtmlHash == htmlHash }
+                }
+            val cachedTitle = cache.translatedTitle.takeIf { cache.titleHash == titleHash }
+            if (cachedHtml != null && cachedTitle != null) {
+                return@withContext ArticleTranslation(cachedTitle, cachedHtml, cache.sourceLanguage)
+            }
+
+            val translated = aiArticleTranslator.translate(title = title, html = html, settings = settings)
+            val translatedTitle = translated.translatedTitle.ifBlank { title }
+            val translatedHtml = translated.translatedHtml.ifBlank { html }
+            val updatedCache =
+                cache.copy(
+                    sourceLanguage = cache.sourceLanguage,
+                    titleHash = titleHash,
+                    translatedTitle = translatedTitle,
+                    articleHtmlHash = if (!isFullText) htmlHash else cache.articleHtmlHash,
+                    translatedArticleHtml = if (!isFullText) translatedHtml else cache.translatedArticleHtml,
+                    fullArticleHtmlHash = if (isFullText) htmlHash else cache.fullArticleHtmlHash,
+                    translatedFullArticleHtml = if (isFullText) translatedHtml else cache.translatedFullArticleHtml,
+                )
+            saveCache(itemId, settings, AI_TARGET_LANGUAGE, updatedCache, AI_CACHE_PROVIDER)
+            ArticleTranslation(translatedTitle, translatedHtml, cache.sourceLanguage)
+        }
+
     suspend fun hasCachedTranslatedArticle(
         itemId: Long,
         title: String,
@@ -437,8 +483,9 @@ class TranslationManager(
         itemId: Long,
         settings: OpenAISettings,
         targetLanguage: String,
+        providerOverride: String? = null,
     ): CachedTranslations =
-        cacheFile(itemId, settings, targetLanguage)
+        cacheFile(itemId, settings, targetLanguage, providerOverride)
             .takeIf(File::isFile)
             ?.readText()
             ?.let { runCatching { json.decodeFromString<CachedTranslations>(it) }.getOrNull() }
@@ -449,8 +496,9 @@ class TranslationManager(
         settings: OpenAISettings,
         targetLanguage: String,
         cache: CachedTranslations,
+        providerOverride: String? = null,
     ) {
-        val file = cacheFile(itemId, settings, targetLanguage)
+        val file = cacheFile(itemId, settings, targetLanguage, providerOverride)
         file.parentFile?.mkdirs()
         file.writeText(json.encodeToString(CachedTranslations.serializer(), cache))
     }
@@ -459,9 +507,10 @@ class TranslationManager(
         itemId: Long,
         settings: OpenAISettings,
         targetLanguage: String,
+        providerOverride: String? = null,
     ): File {
         val provider =
-            when {
+            providerOverride ?: when {
                 settings.isLocalTranslation -> "local"
                 settings.isDeepL -> "deepl"
                 else -> "openai"
@@ -674,6 +723,11 @@ class TranslationManager(
                 ),
         )
         return detectedSameLanguage
+    }
+
+    companion object {
+        private const val AI_TARGET_LANGUAGE = "ja"
+        private const val AI_CACHE_PROVIDER = "ai"
     }
 }
 

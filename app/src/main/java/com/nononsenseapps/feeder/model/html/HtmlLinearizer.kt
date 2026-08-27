@@ -820,8 +820,24 @@ class HtmlLinearizer(
         element: Element,
     ): List<LinearImageSource> {
         val absSrc: String = element.attr("abs:src")
-        val dataImgUrl: String = element.attr("data-img-url").ifBlank { element.attr("data-src") }
-        val srcSet: String = element.attr("srcset").ifBlank { element.attr("data-responsive") }
+        val lazyImageUrl: String =
+            element
+                .attr("data-img-url")
+                .ifBlank { element.attr("data-sco-src") }
+                .ifBlank { element.attr("data-src") }
+                .ifBlank {
+                    element
+                        .attr("data-original")
+                        .takeIf {
+                            absSrc.isBlank() || absSrc.startsWith("data:")
+                        }.orEmpty()
+                }
+        val srcSet: String =
+            element
+                .attr("srcset")
+                .ifBlank { element.attr("data-sco-srcset") }
+                .ifBlank { element.attr("data-srcset") }
+                .ifBlank { element.attr("data-responsive") }
         // Can be set on divs - see ArsTechnica
         val backgroundImage =
             element
@@ -909,7 +925,7 @@ class HtmlLinearizer(
             val width = element.attr("width").toIntOrNull()
             val height = element.attr("height").toIntOrNull()
 
-            dataImgUrl.takeIf { it.isNotBlank() }?.let {
+            lazyImageUrl.takeIf { it.isNotBlank() }?.let {
                 val url = resolve(baseUrl, it)
                 if (width != null && height != null) {
                     result.add(
@@ -934,7 +950,7 @@ class HtmlLinearizer(
                 }
             }
 
-            absSrc.takeIf { it.isNotBlank() }?.let {
+            absSrc.takeIf { it.isNotBlank() && (!it.startsWith("data:") || lazyImageUrl.isBlank()) }?.let {
                 // inline data images can't be resolved, the result is an empty string
                 val url =
                     if (it.startsWith("data:")) {

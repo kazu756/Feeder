@@ -321,6 +321,57 @@ class HtmlLinearizerTest {
     }
 
     @Test
+    fun `data sco src replaces inline placeholder`() {
+        val html =
+            """<html><body><img src="data:image/svg+xml;base64,placeholder" data-sco-src="https://example.com/real.jpg"/></body></html>"""
+
+        val image = linearizer.linearize(html, baseUrl).elements.single() as LinearImage
+
+        assertEquals(listOf("https://example.com/real.jpg"), image.sources.map { it.imgUri })
+    }
+
+    @Test
+    fun `data sco srcset uses existing descriptor parsing`() {
+        val html =
+            """<html><body><img data-sco-srcset="https://example.com/one.jpg 1x, https://example.com/wide.jpg 800w"/></body></html>"""
+
+        val sources = (linearizer.linearize(html, baseUrl).elements.single() as LinearImage).sources
+
+        assertEquals(1f, sources[0].pixelDensity)
+        assertEquals(800, sources[1].screenWidth)
+    }
+
+    @Test
+    fun `data srcset uses existing descriptor parsing`() {
+        val html =
+            """<html><body><img data-srcset="https://example.com/one.jpg 1x, https://example.com/two.jpg 2x"/></body></html>"""
+
+        val sources = (linearizer.linearize(html, baseUrl).elements.single() as LinearImage).sources
+
+        assertEquals(listOf(1f, 2f), sources.map { it.pixelDensity })
+    }
+
+    @Test
+    fun `data original is used when src is a placeholder`() {
+        val html =
+            """<html><body><img src="data:image/gif;base64,placeholder" data-original="images/real.jpg"/></body></html>"""
+
+        val image = linearizer.linearize(html, "https://example.com/articles/story").elements.single() as LinearImage
+
+        assertEquals(listOf("https://example.com/articles/images/real.jpg"), image.sources.map { it.imgUri })
+    }
+
+    @Test
+    fun `normal src remains preferred over data original`() {
+        val html =
+            """<html><body><img src="https://example.com/current.jpg" data-original="https://example.com/original.jpg"/></body></html>"""
+
+        val image = linearizer.linearize(html, baseUrl).elements.single() as LinearImage
+
+        assertEquals(listOf("https://example.com/current.jpg"), image.sources.map { it.imgUri })
+    }
+
+    @Test
     fun `simple image with relative url`() {
         val html = "<html><body><img src=\"/image.jpg\"/></body></html>"
 
@@ -339,6 +390,23 @@ class HtmlLinearizerTest {
             ),
             result[0],
         )
+    }
+
+    @Test
+    fun `image urls retain existing resolution behavior`() {
+        fun resolvedImageUrl(
+            src: String,
+            base: String = "https://example.com/articles/story",
+        ): String {
+            val html = "<html><body><img src=\"$src\"/></body></html>"
+            return ((linearizer.linearize(html, base).elements.single() as LinearImage).sources.single()).imgUri
+        }
+
+        assertEquals("https://example.com/images/root.jpg", resolvedImageUrl("/images/root.jpg"))
+        assertEquals("https://example.com/other/relative.jpg", resolvedImageUrl("../other/relative.jpg"))
+        assertEquals("https://cdn.example.com/image.jpg", resolvedImageUrl("//cdn.example.com/image.jpg"))
+        assertEquals("https://example.com/image.jpg?width=800&fit=cover", resolvedImageUrl("/image.jpg?width=800&amp;fit=cover"))
+        assertEquals("https://images.example.com/absolute.jpg", resolvedImageUrl("https://images.example.com/absolute.jpg"))
     }
 
     @Test

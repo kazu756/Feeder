@@ -11,6 +11,7 @@ import com.nononsenseapps.feeder.archmodel.OpenAISettings
 import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
 import io.ktor.http.takeFrom
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -225,6 +226,16 @@ class OpenAIApi(
         }
     }
 
+    sealed interface AiTranslationChunkResult {
+        data class Success(
+            val content: String,
+        ) : AiTranslationChunkResult
+
+        data class Error(
+            val message: String,
+        ) : AiTranslationChunkResult
+    }
+
     suspend fun createUnreadDigest(
         prompt: UnreadDigestPrompt,
         settings: OpenAISettings,
@@ -252,6 +263,38 @@ class OpenAIApi(
             }
         } catch (e: Exception) {
             UnreadDigestResult.Error(content = e.message ?: e.cause?.message ?: "Unknown error")
+        }
+    }
+
+    internal suspend fun translateChunkWithAi(
+        chunk: AiTranslationChunk,
+        settings: OpenAISettings,
+    ): AiTranslationChunkResult {
+        if (!settings.canSummarize) {
+            return AiTranslationChunkResult.Error("AI translation is not supported for this provider")
+        }
+        return try {
+            val response =
+                openAIClientFactory(settings).chatCompletion(
+                    request = AiTranslationPrompt.request(chunk, settings, json),
+                    requestOptions = null,
+                )
+            val content =
+                response.choices
+                    .firstOrNull()
+                    ?.message
+                    ?.content
+                    ?.trim()
+                    .orEmpty()
+            if (content.isEmpty()) {
+                AiTranslationChunkResult.Error("AI translation response was empty")
+            } else {
+                AiTranslationChunkResult.Success(content)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AiTranslationChunkResult.Error(e.message ?: e.cause?.message ?: "AI translation failed")
         }
     }
 

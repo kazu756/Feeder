@@ -357,6 +357,8 @@
   <string name="could_not_remove_font">Could not remove font</string>
   <string name="something_went_wrong">Something went wrong</string>
   <string name="translate_article">Translate article</string>
+  <string name="translate_article_with_ai">Translate naturally with AI</string>
+  <string name="translating_article_with_ai">Translating with AI…</string>
   <string name="show_original_language">Show original (%1$s)</string>
   <string name="original_article">original</string>
   <string name="preparing_offline_translation_model">Preparing offline translation model %1$s to %2$s…</string>

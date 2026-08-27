@@ -254,4 +254,6 @@
     <string name="time_out_validation_error">タイムアウトは３０～６００秒にしてください</string>
     <string name="time_out_placeholder">OpenAIリクエストのタイムアウト</string>
     <string name="api_key">API キー</string>
+  <string name="translate_article_with_ai">AIで自然に翻訳</string>
+  <string name="translating_article_with_ai">AIで翻訳しています…</string>
 </resources>

@@ -56,6 +56,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import coil3.size.Precision
 import coil3.size.Scale
@@ -114,9 +116,15 @@ import com.nononsenseapps.feeder.ui.compose.utils.ProvideScaledText
 import com.nononsenseapps.feeder.ui.compose.utils.WithAllPreviewProviders
 import com.nononsenseapps.feeder.ui.compose.utils.focusableInNonTouchMode
 import com.nononsenseapps.feeder.util.logDebug
+import com.nononsenseapps.feeder.util.validHttpArticleUrlOrNull
 import kotlin.math.abs
 
 private const val LOG_TAG = "FEEDER_LINEARCON"
+
+internal fun articleImageHeaders(articleLink: String?): NetworkHeaders =
+    validHttpArticleUrlOrNull(articleLink)?.let { validArticleLink ->
+        NetworkHeaders.Builder().set("Referer", validArticleLink).build()
+    } ?: NetworkHeaders.EMPTY
 
 fun LazyListScope.linearArticleContent(
     articleContent: LinearArticle,
@@ -155,8 +163,10 @@ fun ColumnArticleContent(
     articleContent: LinearArticle,
     onLinkClick: (url: String, index: Int?) -> Unit,
     modifier: Modifier = Modifier,
+    articleLink: String? = null,
     onElementPosition: (index: Int, yPosition: Float) -> Unit = { _, _ -> },
 ) {
+    val imageHeaders = remember(articleLink) { articleImageHeaders(articleLink) }
     articleContent.elements.forEachIndexed { index, element ->
         ProvideTextStyle(
             MaterialTheme.typography.bodyLarge.merge(
@@ -181,6 +191,7 @@ fun ColumnArticleContent(
                         Modifier
                             .widthIn(max = minOf(maxWidth, LocalDimens.current.maxReaderWidth))
                             .fillMaxWidth(),
+                    imageHeaders = imageHeaders,
                 )
             }
         }
@@ -194,6 +205,7 @@ fun LinearElementContent(
     idToIndex: Map<String, Int>,
     onLinkClick: (url: String, index: Int?) -> Unit,
     modifier: Modifier = Modifier,
+    imageHeaders: NetworkHeaders = NetworkHeaders.EMPTY,
 ) {
     when (linearElement) {
 //        is LinearList ->
@@ -211,6 +223,7 @@ fun LinearElementContent(
                 onLinkClick = onLinkClick,
                 modifier = modifier,
                 idToIndex = idToIndex,
+                imageHeaders = imageHeaders,
             )
 
         is LinearImage ->
@@ -219,6 +232,7 @@ fun LinearElementContent(
                 onLinkClick = onLinkClick,
                 modifier = modifier,
                 idToIndex = idToIndex,
+                imageHeaders = imageHeaders,
             )
 
         is LinearBlockQuote -> {
@@ -270,6 +284,7 @@ fun LinearElementContent(
                 onLinkClick = onLinkClick,
                 modifier = modifier,
                 idToIndex = idToIndex,
+                imageHeaders = imageHeaders,
             )
 
         is LinearAudio ->
@@ -421,6 +436,7 @@ fun LinearListContent(
     idToIndex: Map<String, Int>,
     onLinkClick: (url: String, index: Int?) -> Unit,
     modifier: Modifier = Modifier,
+    imageHeaders: NetworkHeaders = NetworkHeaders.EMPTY,
 ) {
     Column(
         modifier = modifier,
@@ -433,6 +449,7 @@ fun LinearListContent(
                 allowHorizontalScroll = allowHorizontalScroll,
                 idToIndex = idToIndex,
                 onLinkClick = onLinkClick,
+                imageHeaders = imageHeaders,
             )
         }
     }
@@ -445,6 +462,7 @@ fun LinearListItemContent(
     idToIndex: Map<String, Int>,
     onLinkClick: (url: String, index: Int?) -> Unit,
     modifier: Modifier = Modifier,
+    imageHeaders: NetworkHeaders = NetworkHeaders.EMPTY,
 ) {
     Row(
         verticalAlignment = Alignment.Top,
@@ -469,6 +487,7 @@ fun LinearListItemContent(
                     allowHorizontalScroll = allowHorizontalScroll,
                     onLinkClick = onLinkClick,
                     idToIndex = idToIndex,
+                    imageHeaders = imageHeaders,
                 )
             }
         }
@@ -481,6 +500,7 @@ fun LinearImageContent(
     idToIndex: Map<String, Int>,
     onLinkClick: (url: String, index: Int?) -> Unit,
     modifier: Modifier = Modifier,
+    imageHeaders: NetworkHeaders = NetworkHeaders.EMPTY,
 ) {
     if (linearImage.sources.isEmpty()) {
         return
@@ -554,6 +574,7 @@ fun LinearImageContent(
                             ImageRequest
                                 .Builder(LocalContext.current)
                                 .data(bestImage.imgUri)
+                                .httpHeaders(imageHeaders)
                                 .scale(Scale.FIT)
                                 // DO NOT use the actualSize parameter here
                                 .size(Size(imageWidth, imageHeight ?: imageWidth))
@@ -819,6 +840,7 @@ fun LinearTableContent(
     idToIndex: Map<String, Int>,
     onLinkClick: (url: String, index: Int?) -> Unit,
     modifier: Modifier = Modifier,
+    imageHeaders: NetworkHeaders = NetworkHeaders.EMPTY,
 ) {
     val borderColor = MaterialTheme.colorScheme.outlineVariant
     Table(
@@ -897,6 +919,7 @@ fun LinearTableContent(
                                 onLinkClick = onLinkClick,
                                 modifier = Modifier.fillMaxWidth(),
                                 idToIndex = idToIndex,
+                                imageHeaders = imageHeaders,
                             )
                         }
                     }

@@ -215,6 +215,9 @@ fun ArticleScreen(
         onTranslate = {
             viewModel.translate()
         },
+        onTranslateWithAi = {
+            viewModel.translateWithAi()
+        },
         onOpenSystemTranslationSettings = {
             activityLauncher.startActivity(
                 openAdjacentIfSuitable = false,
@@ -261,6 +264,7 @@ fun ArticleScreen(
     onNavigateUp: () -> Unit,
     onSummarize: () -> Unit,
     onTranslate: () -> Unit,
+    onTranslateWithAi: () -> Unit,
     onOpenSystemTranslationSettings: () -> Unit,
     onDismissSystemTranslationSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -407,6 +411,24 @@ fun ArticleScreen(
                                                     },
                                                 ),
                                             )
+                                        },
+                                    )
+                                }
+
+                                if (viewState.showTranslateWithAi) {
+                                    DropdownMenuItem(
+                                        onClick = {
+                                            onShowToolbarMenu(false)
+                                            onTranslateWithAi()
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.Translate,
+                                                contentDescription = null,
+                                            )
+                                        },
+                                        text = {
+                                            Text(stringResource(R.string.translate_article_with_ai))
                                         },
                                     )
                                 }
@@ -702,6 +724,9 @@ fun ArticleContent(
 
         if (viewState.isTranslationLoading) {
             offsetCounter++
+            if (viewState.isAiTranslationLoading) {
+                Text(text = stringResource(R.string.translating_article_with_ai))
+            }
             viewState.translationModelDownloadProgress?.let { progress ->
                 TranslationModelDownloadProgress(progress)
             } ?: LinearProgressIndicator(
@@ -719,6 +744,7 @@ fun ArticleContent(
                 TextToDisplay.CONTENT -> {
                     ColumnArticleContent(
                         articleContent = viewState.articleContent,
+                        articleLink = viewState.articleLink,
                         onLinkClick = { link, index ->
                             if (index != null && elementPositions.containsKey(index)) {
                                 // Anchor link - scroll to the element position
