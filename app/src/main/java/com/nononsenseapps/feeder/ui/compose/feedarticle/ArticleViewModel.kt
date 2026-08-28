@@ -1,6 +1,5 @@
 package com.nononsenseapps.feeder.ui.compose.feedarticle
 
-import android.util.Log
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.SavedStateHandle
@@ -58,6 +57,7 @@ import com.nononsenseapps.feeder.util.logDebug
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -66,6 +66,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -151,6 +152,9 @@ class ArticleViewModel(
     private val aiTranslationLoading = MutableStateFlow(false)
     private var aiTranslationJob: Job? = null
     private var handledInitialOpenActions = false
+    private val readerFallbackEventGate = ReaderFallbackEventGate()
+    private val _uiEvents = Channel<ArticleUiEvent>(capacity = Channel.BUFFERED)
+    val uiEvents = _uiEvents.receiveAsFlow()
 
     fun saveScrollPosition(pos: Int) {
         state["scrollPosition"] = pos
@@ -395,99 +399,74 @@ class ArticleViewModel(
     ): LinearArticle {
         logDebug(LOG_TAG, "parseArticleContent(${article.id}, $fullText)")
         val contentBaseUrl = articleBaseUrl(article.link, article.feedUrl)
-        return try {
-            withContext(Dispatchers.IO) {
-                val htmlLinearizer =
-                    HtmlLinearizer(
-                        tooLargeText = application.getString(R.string.failed_to_fetch_full_article_too_large),
-                        openInBrowserText = application.getString(R.string.open_in_web_view),
-                        articleLink = article.link ?: "",
-                    )
-                when (fullText) {
-                    false -> {
-                        if (blobFile(article.id, filePathProvider.articleDir).isFile) {
-                            try {
-                                blobInputStream(article.id, filePathProvider.articleDir)
-                                    .use {
-                                        htmlLinearizer.linearize(
-                                            inputStream = it,
-                                            baseUrl = contentBaseUrl,
-                                        )
-                                    }.also {
-                                        textToDisplay.update { TextToDisplay.CONTENT }
-                                    }
-                            } catch (e: Exception) {
-                                // EOFException is possible
-                                Log.e(LOG_TAG, "Could not open blob", e)
-                                textToDisplay.update { TextToDisplay.FAILED_TO_LOAD_FULLTEXT }
-                                LinearArticle(elements = emptyList())
+        return withContext(Dispatchers.IO) {
+            val htmlLinearizer =
+                HtmlLinearizer(
+                    tooLargeText = application.getString(R.string.failed_to_fetch_full_article_too_large),
+                    openInBrowserText = application.getString(R.string.open_in_web_view),
+                    articleLink = article.link ?: "",
+                )
+            val result =
+                resolveReaderContent(
+                    loadFullText =
+                        if (fullText) {
+                            {
+                                if (!blobFullFile(article.id, filePathProvider.fullArticleDir).isFile &&
+                                    retrieveFullText(article.id).leftOrNull() != null
+                                ) {
+                                    null
+                                } else {
+                                    readFullArticleBlobIfPresent(article.id)
+                                        ?.takeIf(String::isNotBlank)
+                                        ?.let { htmlLinearizer.linearize(it, contentBaseUrl) }
+                                }
                             }
                         } else {
-                            Log.e(LOG_TAG, "No default file to parse. Attempting to fetch feed again")
-                            // Should not happen but keeping this as a fallback
+                            null
+                        },
+                    loadRss = {
+                        if (!blobFile(article.id, filePathProvider.articleDir).isFile) {
                             runOnceRssSync(
                                 di = di,
                                 feedId = article.feedId,
                                 forceNetwork = true,
                                 triggeredByUser = true,
                             )
-                            textToDisplay.update { TextToDisplay.CONTENT }
-                            htmlLinearizer.linearize(
-                                "Sorry, due to a coding oversight, " +
-                                    "the full offline version of this article has been permanently deleted, " +
-                                    "see <a href=\"https://github.com/spacecowboy/Feeder/issues/443\">feeder#443</a> " +
-                                    "for updates on this issue<br/><br/>" +
-                                    article.snippet,
-                                contentBaseUrl,
-                            )
                         }
-                    }
+                        readerRssHtml(
+                            rssArticleBody = readArticleBlobIfPresent(article.id),
+                            snippet = article.snippet,
+                            fullTextRequested = fullText,
+                        )?.takeIf(String::isNotBlank)
+                            ?.let { htmlLinearizer.linearize(it, contentBaseUrl) }
+                    },
+                    isUsable = { it.elements.isNotEmpty() },
+                )
 
-                    true -> {
-                        if (!blobFullFile(article.id, filePathProvider.fullArticleDir).isFile) {
-                            // If the fulltext file is missing, try to fetch it
-                            when (retrieveFullText(article.id).leftOrNull()) {
-                                null -> {
-                                    // Success. Do nothing yet
-                                    null
-                                }
-                                is NoBody -> TextToDisplay.FAILED_MISSING_BODY
-                                is NoUrl -> TextToDisplay.FAILED_MISSING_LINK
-                                is UnsupportedContentType -> TextToDisplay.FAILED_NOT_HTML
-                                is NotHTML -> TextToDisplay.FAILED_NOT_HTML
-                                is FullTextTooLarge -> TextToDisplay.FAILED_FULLTEXT_TOO_LARGE
-                                else -> TextToDisplay.FAILED_TO_LOAD_FULLTEXT
-                            }?.let { errorText ->
-                                textToDisplay.update { errorText }
-                            }
-                        }
-                        if (blobFullFile(article.id, filePathProvider.fullArticleDir).isFile) {
-                            try {
-                                blobFullInputStream(article.id, filePathProvider.fullArticleDir)
-                                    .use {
-                                        htmlLinearizer.linearize(
-                                            inputStream = it,
-                                            baseUrl = contentBaseUrl,
-                                        )
-                                    }.also {
-                                        textToDisplay.update { TextToDisplay.CONTENT }
-                                    }
-                            } catch (e: Exception) {
-                                // EOFException is possible
-                                Log.e(LOG_TAG, "Could not open blob", e)
-                                textToDisplay.update { TextToDisplay.FAILED_TO_LOAD_FULLTEXT }
-                                LinearArticle(elements = emptyList())
-                            }
-                        } else {
-                            // Error text should already be set above
-                            LinearArticle(elements = emptyList())
-                        }
+            when (result) {
+                is ReaderContentResult.Content -> {
+                    if (fullText && result.source == ReaderContentSource.RSS) {
+                        displayFullTextOverride.value = false
                     }
+                    textToDisplay.value = TextToDisplay.CONTENT
+                    result.value
+                }
+
+                ReaderContentResult.Unavailable -> {
+                    textToDisplay.value = TextToDisplay.FAILED_TO_LOAD_FULLTEXT
+                    notifyReaderLoadFailed(article.link)
+                    LinearArticle(emptyList())
                 }
             }
-        } catch (t: Throwable) {
-            Log.e(LOG_TAG, "Error parsing article", t)
-            LinearArticle(elements = emptyList())
+        }
+    }
+
+    private suspend fun notifyReaderLoadFailed(articleUrl: String?) {
+        when (val action = readerFallbackEventGate.consume(articleUrl)) {
+            is ReaderFallbackAction.OpenCustomTab ->
+                _uiEvents.trySend(ArticleUiEvent.ReaderLoadFailed(action.url))
+            ReaderFallbackAction.InvalidUrl -> toastMaker.makeToast(R.string.no_article_link_browser)
+            ReaderFallbackAction.AlreadyHandled -> Unit
         }
     }
 
@@ -819,6 +798,9 @@ class ArticleViewModel(
 
         val fullText = article.fullTextByDefault
         val html = loadArticleHtml(article, fullText)
+        if (html.isBlank()) {
+            return false
+        }
 
         val hasCachedTranslation =
             translationManager.hasCachedTranslatedArticle(
@@ -912,22 +894,36 @@ class ArticleViewModel(
         fullText: Boolean,
     ): String =
         withContext(Dispatchers.IO) {
-            when (fullText) {
-                false -> readArticleBlobIfPresent(article.id) ?: article.snippet
-
-                true -> {
-                    val cachedHtml = readFullArticleBlobIfPresent(article.id)
-                    if (cachedHtml != null) {
-                        return@withContext cachedHtml
-                    }
-
-                    val error = retrieveFullText(article.id).leftOrNull()
-                    if (error != null) {
-                        throw IllegalStateException("Cannot load article: ${error.description}", error.throwable)
-                    }
-                    readFullArticleBlobIfPresent(article.id)
-                        ?: throw IllegalStateException("Cannot load article")
-                }
+            when (
+                val result =
+                    resolveReaderContent(
+                        loadFullText =
+                            if (fullText) {
+                                {
+                                    val cachedHtml = readFullArticleBlobIfPresent(article.id)
+                                    if (!cachedHtml.isNullOrBlank()) {
+                                        cachedHtml
+                                    } else if (retrieveFullText(article.id).leftOrNull() == null) {
+                                        readFullArticleBlobIfPresent(article.id)
+                                    } else {
+                                        null
+                                    }
+                                }
+                            } else {
+                                null
+                            },
+                        loadRss = {
+                            readerRssHtml(
+                                rssArticleBody = readArticleBlobIfPresent(article.id),
+                                snippet = article.snippet,
+                                fullTextRequested = fullText,
+                            )
+                        },
+                        isUsable = String::isNotBlank,
+                    )
+            ) {
+                is ReaderContentResult.Content -> result.value
+                ReaderContentResult.Unavailable -> ""
             }
         }
 

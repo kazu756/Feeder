@@ -155,6 +155,15 @@ fun ArticleScreen(
 
     val toolbarColor = MaterialTheme.colorScheme.surface.toArgb()
 
+    LaunchedEffect(viewModel, toolbarColor) {
+        viewModel.uiEvents.collect { event ->
+            when (event) {
+                is ArticleUiEvent.ReaderLoadFailed ->
+                    activityLauncher.openLinkInCustomTab(event.articleUrl, toolbarColor)
+            }
+        }
+    }
+
     ArticleScreen(
         viewState = viewState,
         onToggleFullText = viewModel::toggleFullText,
