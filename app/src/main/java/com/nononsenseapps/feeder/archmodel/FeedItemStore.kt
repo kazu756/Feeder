@@ -57,7 +57,7 @@ class FeedItemStore(
         feedId: Long,
         blockTime: Instant,
     ) {
-        blocklistDao.setItemBlockStatusForNewInFeed(feedId, blockTime, settingsStore.applyBlocklistToSummaries.value)
+        blocklistDao.setItemBlockStatusForNewInFeed(feedId, blockTime, settingsStore.applyBlocklistToSummaries.value, settingsStore.applyBlocklistToLinks.value)
     }
 
     fun getFeedItemCountRaw(
