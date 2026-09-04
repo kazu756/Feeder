@@ -187,6 +187,7 @@
     <string name="block_list_description">次のフィルターをタイトルに含む記事を隠します。例:</string>
     <string name="feed_icon">フィードのアイコン</string>
     <string name="saved_articles">保存された記事</string>
+    <string name="recently_viewed">最近見た記事</string>
     <string name="saved_article">保存された記事</string>
     <string name="save_article">記事を保存する</string>
     <string name="unsave_article">記事を保存するのをやめる</string>

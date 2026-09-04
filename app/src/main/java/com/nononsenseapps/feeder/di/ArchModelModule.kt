@@ -5,6 +5,7 @@ import com.nononsenseapps.feeder.archmodel.FeedItemStore
 import com.nononsenseapps.feeder.archmodel.FeedStore
 import com.nononsenseapps.feeder.archmodel.FontStore
 import com.nononsenseapps.feeder.archmodel.OpenAISettings
+import com.nononsenseapps.feeder.archmodel.RecentlyViewedStore
 import com.nononsenseapps.feeder.archmodel.Repository
 import com.nononsenseapps.feeder.archmodel.SessionStore
 import com.nononsenseapps.feeder.archmodel.SettingsStore
@@ -49,6 +50,7 @@ val archModelModule =
         bind<Repository>() with singleton { Repository(di) }
         bind<SessionStore>() with singleton { SessionStore() }
         bind<SettingsStore>() with singleton { SettingsStore(di) }
+        bind<RecentlyViewedStore>() with singleton { RecentlyViewedStore(di) }
         bind<FeedStore>() with singleton { FeedStore(di) }
         bind<FontStore>() with singleton { FontStore(di) }
         bind<FeedItemStore>() with singleton { FeedItemStore(di) }

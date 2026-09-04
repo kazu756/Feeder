@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.Immutable
 import androidx.paging.PagingData
+import androidx.paging.insertSeparators
 import com.nononsenseapps.feeder.ApplicationCoroutineScope
 import com.nononsenseapps.feeder.background.runOnceBlocklistUpdate
 import com.nononsenseapps.feeder.background.runOnceRssSync
@@ -19,6 +20,7 @@ import com.nononsenseapps.feeder.db.room.FeedItemIdWithLink
 import com.nononsenseapps.feeder.db.room.FeedItemWithFeed
 import com.nononsenseapps.feeder.db.room.FeedTitle
 import com.nononsenseapps.feeder.db.room.ID_ALL_FEEDS
+import com.nononsenseapps.feeder.db.room.ID_RECENTLY_VIEWED_ARTICLES
 import com.nononsenseapps.feeder.db.room.ID_SAVED_ARTICLES
 import com.nononsenseapps.feeder.db.room.ID_UNSET
 import com.nononsenseapps.feeder.db.room.RemoteFeed
@@ -44,6 +46,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.update
@@ -60,6 +63,7 @@ class Repository(
     override val di: DI,
 ) : DIAware {
     private val settingsStore: SettingsStore by instance()
+    private val recentlyViewedStore: RecentlyViewedStore by instance()
     private val sessionStore: SessionStore by instance()
     private val feedItemStore: FeedItemStore by instance()
     private val feedStore: FeedStore by instance()
@@ -406,35 +410,39 @@ class Repository(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun getCurrentFeedListItems(): Flow<PagingData<FeedListItem>> =
-        combine(
-            currentFeedAndTag,
-            minReadTime,
-            currentSorting,
-            feedListFilter,
-            search,
-        ) { feedAndTag, minReadTime, currentSorting, feedListFilter, search ->
-            val (feedId, tag) = feedAndTag
-            FeedListArgs(
-                feedId = feedId,
-                tag = tag,
-                minReadTime =
-                    when (feedId) {
-                        ID_SAVED_ARTICLES -> Instant.EPOCH
-                        else -> minReadTime
-                    },
-                newestFirst = currentSorting == SortingOptions.NEWEST_FIRST,
-                filter = feedListFilter,
-                search = search,
-            )
-        }.flatMapLatest {
-            feedItemStore.getPagedFeedItemsRaw(
-                feedId = it.feedId,
-                tag = it.tag,
-                minReadTime = it.minReadTime,
-                newestFirst = it.newestFirst,
-                filter = it.filter,
-                search = it.search,
-            )
+        currentFeedAndTag.flatMapLatest { (feedId, tag) ->
+            if (feedId == ID_RECENTLY_VIEWED_ARTICLES) {
+                recentlyViewedStore.articleIds.flatMapLatest { articleIds ->
+                    feedItemStore
+                        .getFeedItemsByIds(articleIds)
+                        .map { PagingData.from(it) }
+                }
+            } else {
+                combine(
+                    minReadTime,
+                    currentSorting,
+                    feedListFilter,
+                    search,
+                ) { minReadTime, currentSorting, feedListFilter, search ->
+                    FeedListArgs(
+                        feedId = feedId,
+                        tag = tag,
+                        minReadTime = if (feedId == ID_SAVED_ARTICLES) Instant.EPOCH else minReadTime,
+                        newestFirst = currentSorting == SortingOptions.NEWEST_FIRST,
+                        filter = feedListFilter,
+                        search = search,
+                    )
+                }.flatMapLatest {
+                    feedItemStore.getPagedFeedItemsRaw(
+                        feedId = it.feedId,
+                        tag = it.tag,
+                        minReadTime = it.minReadTime,
+                        newestFirst = it.newestFirst,
+                        filter = it.filter,
+                        search = it.search,
+                    )
+                }
+            }
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -445,33 +453,35 @@ class Repository(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun getCurrentFeedListVisibleItemCount(): Flow<Int> =
-        combine(
-            currentFeedAndTag,
-            minReadTime,
-            feedListFilter,
-            search,
-        ) { feedAndTag, minReadTime, feedListFilter, search ->
-            val (feedId, tag) = feedAndTag
-            FeedListArgs(
-                feedId = feedId,
-                tag = tag,
-                minReadTime =
-                    when (feedId) {
-                        ID_SAVED_ARTICLES -> Instant.EPOCH
-                        else -> minReadTime
-                    },
-                newestFirst = false,
-                filter = feedListFilter,
-                search = search,
-            )
-        }.flatMapLatest {
-            feedItemStore.getFeedItemCountRaw(
-                feedId = it.feedId,
-                tag = it.tag,
-                minReadTime = it.minReadTime,
-                filter = it.filter,
-                search = it.search,
-            )
+        currentFeedAndTag.flatMapLatest { (feedId, tag) ->
+            if (feedId == ID_RECENTLY_VIEWED_ARTICLES) {
+                recentlyViewedStore.articleIds.flatMapLatest { articleIds ->
+                    feedItemStore.getFeedItemsByIds(articleIds).map { it.size }
+                }
+            } else {
+                combine(
+                    minReadTime,
+                    feedListFilter,
+                    search,
+                ) { minReadTime, feedListFilter, search ->
+                    FeedListArgs(
+                        feedId = feedId,
+                        tag = tag,
+                        minReadTime = if (feedId == ID_SAVED_ARTICLES) Instant.EPOCH else minReadTime,
+                        newestFirst = false,
+                        filter = feedListFilter,
+                        search = search,
+                    )
+                }.flatMapLatest {
+                    feedItemStore.getFeedItemCountRaw(
+                        feedId = it.feedId,
+                        tag = it.tag,
+                        minReadTime = it.minReadTime,
+                        filter = it.filter,
+                        search = it.search,
+                    )
+                }
+            }
         }
 
     val currentArticle: Flow<Article> =
@@ -481,6 +491,8 @@ class Repository(
             }.mapLatest { item ->
                 Article(item = item)
             }
+
+    fun recordRecentlyViewedArticle(articleId: Long) = recentlyViewedStore.recordArticle(articleId)
 
     suspend fun getFeed(feedId: Long): Feed? = feedStore.getFeed(feedId)
 
@@ -540,28 +552,10 @@ class Repository(
     fun getScreenTitleForFeedOrTag(
         feedId: Long,
         tag: String,
-    ) = getUnreadCount(feedId, tag).mapLatest { unreadCount ->
-        ScreenTitle(
-            title =
-                when {
-                    feedId > ID_UNSET -> feedStore.getDisplayTitle(feedId)
-                    tag.isNotBlank() -> tag
-                    else -> null
-                },
-            type =
-                when (feedId) {
-                    ID_UNSET -> FeedType.TAG
-                    ID_ALL_FEEDS -> FeedType.ALL_FEEDS
-                    ID_SAVED_ARTICLES -> FeedType.SAVED_ARTICLES
-                    else -> FeedType.FEED
-                },
-            unreadCount = unreadCount,
-        )
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    fun getScreenTitleForCurrentFeedOrTag(): Flow<ScreenTitle> =
-        currentFeedAndTag.flatMapLatest { (feedId, tag) ->
+    ): Flow<ScreenTitle> =
+        if (feedId == ID_RECENTLY_VIEWED_ARTICLES) {
+            recentlyViewedScreenTitle()
+        } else {
             getUnreadCount(feedId, tag).mapLatest { unreadCount ->
                 ScreenTitle(
                     title =
@@ -571,13 +565,51 @@ class Repository(
                             else -> null
                         },
                     type =
-                        when {
-                            tag.isNotBlank() -> FeedType.TAG
-                            feedId == ID_UNSET || feedId == ID_ALL_FEEDS -> FeedType.ALL_FEEDS
-                            feedId == ID_SAVED_ARTICLES -> FeedType.SAVED_ARTICLES
+                        when (feedId) {
+                            ID_UNSET -> FeedType.TAG
+                            ID_ALL_FEEDS -> FeedType.ALL_FEEDS
+                            ID_SAVED_ARTICLES -> FeedType.SAVED_ARTICLES
                             else -> FeedType.FEED
                         },
                     unreadCount = unreadCount,
+                )
+            }
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun getScreenTitleForCurrentFeedOrTag(): Flow<ScreenTitle> =
+        currentFeedAndTag.flatMapLatest { (feedId, tag) ->
+            if (feedId == ID_RECENTLY_VIEWED_ARTICLES) {
+                recentlyViewedScreenTitle()
+            } else {
+                getUnreadCount(feedId, tag).mapLatest { unreadCount ->
+                    ScreenTitle(
+                        title =
+                            when {
+                                feedId > ID_UNSET -> feedStore.getDisplayTitle(feedId)
+                                tag.isNotBlank() -> tag
+                                else -> null
+                            },
+                        type =
+                            when {
+                                tag.isNotBlank() -> FeedType.TAG
+                                feedId == ID_UNSET || feedId == ID_ALL_FEEDS -> FeedType.ALL_FEEDS
+                                feedId == ID_SAVED_ARTICLES -> FeedType.SAVED_ARTICLES
+                                else -> FeedType.FEED
+                            },
+                        unreadCount = unreadCount,
+                    )
+                }
+            }
+        }
+
+    private fun recentlyViewedScreenTitle(): Flow<ScreenTitle> =
+        recentlyViewedStore.articleIds.flatMapLatest { articleIds ->
+            feedItemStore.getFeedItemsByIds(articleIds).map { items ->
+                ScreenTitle(
+                    title = null,
+                    type = FeedType.RECENTLY_VIEWED,
+                    unreadCount = items.count(FeedListItem::unread),
                 )
             }
         }
@@ -640,9 +672,18 @@ class Repository(
     val allTags: Flow<List<String>> = feedStore.allTags
 
     fun getPagedNavDrawerItems(): Flow<PagingData<FeedUnreadCount>> =
-        expandedTags.flatMapLatest {
-            feedStore.getPagedNavDrawerItems(it)
-        }
+        expandedTags
+            .flatMapLatest {
+                feedStore.getPagedNavDrawerItems(it)
+            }.map { pagingData ->
+                pagingData.insertSeparators { before, _ ->
+                    if (before?.id == ID_SAVED_ARTICLES) {
+                        FeedUnreadCount(id = ID_RECENTLY_VIEWED_ARTICLES)
+                    } else {
+                        null
+                    }
+                }
+            }
 
     val getUnreadBookmarksCount
         get() =
@@ -657,7 +698,11 @@ class Repository(
     @OptIn(ExperimentalCoroutinesApi::class)
     fun getCurrentlyVisibleFeedTitles(): Flow<List<FeedTitle>> =
         currentFeedAndTag.flatMapLatest { (feedId, tag) ->
-            feedStore.getFeedTitles(feedId, tag)
+            if (feedId == ID_RECENTLY_VIEWED_ARTICLES) {
+                flowOf(emptyList())
+            } else {
+                feedStore.getFeedTitles(feedId, tag)
+            }
         }
 
     val expandedTags: StateFlow<Set<String>> = sessionStore.expandedTags
@@ -926,6 +971,7 @@ enum class FeedType {
     FEED,
     TAG,
     SAVED_ARTICLES,
+    RECENTLY_VIEWED,
     ALL_FEEDS,
 }
 

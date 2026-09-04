@@ -22,6 +22,7 @@ class NavigationDeepLinkViewModel(
     }
 
     fun setCurrentArticle(itemId: Long) {
+        repository.recordRecentlyViewedArticle(itemId)
         viewModelScope.launch {
             repository.markAsReadAndNotified(itemId)
         }

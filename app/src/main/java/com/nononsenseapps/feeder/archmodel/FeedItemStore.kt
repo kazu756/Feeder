@@ -129,6 +129,15 @@ class FeedItemStore(
                     .map { it.toFeedListItem(application) }
             }
 
+    fun getFeedItemsByIds(ids: List<Long>): Flow<List<FeedListItem>> =
+        dao.getPreviewsByIds(ids).map { previews ->
+            orderByArticleIds(
+                articleIds = ids,
+                items = previews,
+                itemId = PreviewItem::id,
+            ).map { it.toFeedListItem(application) }
+        }
+
     private fun StringBuilder.rawQueryFilter(
         filter: FeedListFilter,
         search: String,
@@ -359,6 +368,15 @@ class FeedItemStore(
         )
 
     suspend fun getArticle(id: Long): FeedItemWithFeed? = dao.getFeedItem(id)
+}
+
+internal fun <T> orderByArticleIds(
+    articleIds: List<Long>,
+    items: List<T>,
+    itemId: (T) -> Long,
+): List<T> {
+    val itemsById = items.associateBy(itemId)
+    return articleIds.mapNotNull(itemsById::get)
 }
 
 private fun PreviewItem.toFeedListItem(context: Context) =

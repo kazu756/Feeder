@@ -231,6 +231,7 @@
   <string name="text_scale">Text scale</string>
 
   <string name="saved_articles">Saved articles</string>
+  <string name="recently_viewed">Recently viewed</string>
   <string name="saved_article">Saved article</string>
   <string name="save_article">Save article</string>
   <string name="unsave_article">Stop saving article</string>

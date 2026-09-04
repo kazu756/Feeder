@@ -1224,9 +1224,11 @@ fun FeedScreen(
                     when (viewState.feedScreenTitle.type) {
                         FeedType.FEED, FeedType.TAG -> viewState.feedScreenTitle.title
                         FeedType.SAVED_ARTICLES -> stringResource(id = R.string.saved_articles)
+                        FeedType.RECENTLY_VIEWED -> stringResource(id = R.string.recently_viewed)
                         FeedType.ALL_FEEDS -> stringResource(id = R.string.all_feeds)
                     }.let { title ->
                         if (viewState.feedScreenTitle.type == FeedType.SAVED_ARTICLES ||
+                            viewState.feedScreenTitle.type == FeedType.RECENTLY_VIEWED ||
                             !viewState.showTitleUnreadCount ||
                             viewState.feedScreenTitle.unreadCount == 0 ||
                             title == null

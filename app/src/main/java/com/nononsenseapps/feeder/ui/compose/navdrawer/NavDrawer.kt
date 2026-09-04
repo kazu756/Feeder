@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.minimumInteractiveComponentSize
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -62,6 +63,7 @@ import coil3.size.Precision
 import coil3.size.Scale
 import com.nononsenseapps.feeder.R
 import com.nononsenseapps.feeder.db.room.ID_ALL_FEEDS
+import com.nononsenseapps.feeder.db.room.ID_RECENTLY_VIEWED_ARTICLES
 import com.nononsenseapps.feeder.db.room.ID_SAVED_ARTICLES
 import com.nononsenseapps.feeder.db.room.ID_UNSET
 import com.nononsenseapps.feeder.model.FeedUnreadCount
@@ -151,6 +153,7 @@ fun ListOfFeedsAndTags(
                     when (it.id) {
                         ID_ALL_FEEDS -> ID_ALL_FEEDS
                         ID_SAVED_ARTICLES -> ID_SAVED_ARTICLES
+                        ID_RECENTLY_VIEWED_ARTICLES -> ID_RECENTLY_VIEWED_ARTICLES
                         ID_UNSET -> it.tag
                         else -> it.id
                     }
@@ -161,7 +164,7 @@ fun ListOfFeedsAndTags(
                 },
         ) { itemIndex ->
             val item = feedsAndTags[itemIndex]
-            val showFeedsDivider = itemIndex == 2 && item?.contentType?.isFeedListItem == true
+            val showFeedsDivider = itemIndex == 3 && item?.contentType?.isFeedListItem == true
 
             Column {
                 if (showFeedsDivider) {
@@ -187,6 +190,15 @@ fun ListOfFeedsAndTags(
                         SavedArticles(
                             unreadCount = item.unreadCount,
                             title = stringResource(id = R.string.saved_articles),
+                            onItemClick = {
+                                onItemClick(item)
+                            },
+                        )
+                    }
+
+                    ContentType.RecentlyViewed -> {
+                        RecentlyViewed(
+                            title = stringResource(id = R.string.recently_viewed),
                             onItemClick = {
                                 onItemClick(item)
                             },
@@ -238,6 +250,7 @@ val FeedUnreadCount.contentType: ContentType
             ID_UNSET -> ContentType.Tag
             ID_ALL_FEEDS -> ContentType.AllFeeds
             ID_SAVED_ARTICLES -> ContentType.SavedArticles
+            ID_RECENTLY_VIEWED_ARTICLES -> ContentType.RecentlyViewed
             else -> {
                 if (this.tag.isNotEmpty()) {
                     ContentType.ChildFeed
@@ -250,6 +263,7 @@ val FeedUnreadCount.contentType: ContentType
 enum class ContentType {
     AllFeeds,
     SavedArticles,
+    RecentlyViewed,
     Tag,
     ChildFeed,
     TopLevelFeed,
@@ -265,6 +279,7 @@ private val ContentType.isFeedListItem: Boolean
 
             ContentType.AllFeeds,
             ContentType.SavedArticles,
+            ContentType.RecentlyViewed,
             -> false
         }
 
@@ -382,6 +397,26 @@ private fun SavedArticles(
         image = {
             Icon(
                 Icons.Default.Star,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+        },
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun RecentlyViewed(
+    title: String = "Recently viewed",
+    onItemClick: () -> Unit = {},
+) {
+    Feed(
+        title = title,
+        unreadCount = 0,
+        onItemClick = onItemClick,
+        image = {
+            Icon(
+                Icons.Default.History,
                 contentDescription = null,
                 modifier = Modifier.size(24.dp),
             )

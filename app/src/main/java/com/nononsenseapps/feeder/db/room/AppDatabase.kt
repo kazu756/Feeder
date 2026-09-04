@@ -30,6 +30,7 @@ const val DATABASE_NAME = "rssDatabase"
 const val ID_UNSET: Long = 0
 const val ID_ALL_FEEDS: Long = -10
 const val ID_SAVED_ARTICLES: Long = -20
+const val ID_RECENTLY_VIEWED_ARTICLES: Long = -30
 
 private const val LOG_TAG = "FEEDER_APPDB"
 
