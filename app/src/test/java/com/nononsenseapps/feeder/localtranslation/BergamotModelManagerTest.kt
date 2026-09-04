@@ -14,6 +14,7 @@ import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okio.Buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -24,8 +25,10 @@ import org.junit.rules.TemporaryFolder
 import org.kodein.di.DI
 import org.kodein.di.bind
 import org.kodein.di.singleton
+import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
+import java.util.zip.GZIPOutputStream
 
 class BergamotModelManagerTest {
     @get:Rule
@@ -156,6 +159,54 @@ class BergamotModelManagerTest {
         }
 
     @Test
+    fun mozillaJapaneseModelsSupplementLegacyRegistryAndNormalizeRegionTags() =
+        runTest {
+            server.start()
+            server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+            val manager = modelManager()
+
+            assertEquals(BergamotLanguagePairStatus.AvailableToDownload, manager.languagePairStatus("en", "ja"))
+            assertEquals(BergamotLanguagePairStatus.AvailableToDownload, manager.languagePairStatus("en-US", "ja-JP"))
+            assertEquals(BergamotLanguagePairStatus.AvailableToDownload, manager.languagePairStatus("ja", "en"))
+            assertEquals(BergamotLanguagePairStatus.Unavailable, manager.languagePairStatus("ja", "zz"))
+        }
+
+    @Test
+    fun prepareExpandsGzipBeforeVerifyingAndCachingModelPart() =
+        runTest {
+            server.start()
+            val content = "expanded-model".toByteArray()
+            val compressed = gzip(content)
+            val registry =
+                """
+                {
+                  "deen": {
+                    "model": {
+                      "name": "${server.url("/deen/model.bin.gz")}",
+                      "size": ${compressed.size},
+                      "expectedSha256Hash": "${sha256(content)}",
+                      "gzipCompressed": true
+                    }
+                  }
+                }
+                """.trimIndent()
+            server.enqueue(MockResponse().setResponseCode(200).setBody(registry))
+            server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(compressed)))
+
+            val preparation = modelManager().prepare(sourceLanguage = "de", targetLanguage = "en")
+
+            assertTrue(preparation is BergamotModelPreparation.Ready)
+            val localUrl =
+                (preparation as BergamotModelPreparation.Ready)
+                    .modelRegistry
+                    .single()
+                    .files
+                    .getValue("model")
+                    .url
+            assertEquals(content.toList(), File(requireNotNull(localUrl).removePrefix("file://")).readBytes().toList())
+        }
+
+    @Test
     fun prepareFailsWhenDownloadedModelHashDoesNotMatchRegistry() =
         runTest {
             server.start()
@@ -248,4 +299,10 @@ class BergamotModelManagerTest {
             .getInstance("SHA-256")
             .digest(content)
             .joinToString(separator = "") { byte -> "%02x".format(byte) }
+
+    private fun gzip(content: ByteArray): ByteArray {
+        val output = java.io.ByteArrayOutputStream()
+        GZIPOutputStream(output).use { it.write(content) }
+        return output.toByteArray()
+    }
 }

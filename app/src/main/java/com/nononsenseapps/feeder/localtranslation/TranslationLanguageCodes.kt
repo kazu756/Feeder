@@ -33,6 +33,7 @@ fun normalizeLanguageCode(language: String): String {
         "norwegian", "nb", "nn" -> "nb"
         "persian", "fa" -> "fa"
         "ukrainian", "uk" -> "uk"
+        "japanese", "ja" -> "ja"
         else -> normalized
     }
 }

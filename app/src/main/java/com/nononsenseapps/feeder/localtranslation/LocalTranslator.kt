@@ -64,12 +64,16 @@ class LocalTranslator(
 
             val targetLang = normalizeLanguageCode(targetLanguage)
             val sourceLang =
-                sourceLangHint.ifBlank {
-                    detectSourceLanguage(
-                        content = content,
-                        preserveHtml = preserveHtml,
-                    )
-                }
+                normalizeLanguageCode(
+                    sourceLangHint.ifBlank {
+                        detectSourceLanguage(
+                            content = content,
+                            preserveHtml = preserveHtml,
+                        )
+                    },
+                )
+
+            logDebug(LOG_TAG, "Local translation language pair: $sourceLang->$targetLang")
 
             if (sourceLang == targetLang) {
                 return@withContext TranslationResult.Success(
@@ -124,12 +128,14 @@ class LocalTranslator(
 
             val targetLang = normalizeLanguageCode(targetLanguage)
             val sourceLang =
-                sourceLangHint.ifBlank {
-                    detectSourceLanguage(
-                        content = content,
-                        preserveHtml = preserveHtml,
-                    )
-                }
+                normalizeLanguageCode(
+                    sourceLangHint.ifBlank {
+                        detectSourceLanguage(
+                            content = content,
+                            preserveHtml = preserveHtml,
+                        )
+                    },
+                )
             if (sourceLang == targetLang) {
                 return@withContext true
             }
