@@ -176,11 +176,19 @@ interface FeedItemDao {
         LEFT JOIN feeds ON feed_items.feed_id = feeds.id
         WHERE read_time IS NULL
           AND block_time IS NULL
+          AND (
+            :feedId = $ID_ALL_FEEDS
+            OR (:feedId > $ID_UNSET AND feed_items.feed_id = :feedId)
+            OR (:feedId = $ID_UNSET AND :tag != '' AND feeds.tag = :tag)
+          )
         ORDER BY $FEED_ITEM_LIST_SORT_ORDER_DESC
         LIMIT 50
         """,
     )
-    suspend fun getUnreadDigestPreviews(): List<PreviewItem>
+    suspend fun getUnreadDigestPreviews(
+        feedId: Long,
+        tag: String,
+    ): List<PreviewItem>
 
     @Query(
         """

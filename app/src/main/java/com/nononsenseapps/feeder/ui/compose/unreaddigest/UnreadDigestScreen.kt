@@ -15,7 +15,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -81,17 +80,16 @@ fun UnreadDigestScreen(
                         ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(current.paragraphs) { paragraph -> Text(paragraph) }
-                    if (current.articleLinks.isNotEmpty()) {
-                        item { HorizontalDivider(modifier = Modifier.padding(top = 8.dp)) }
-                        item { Text(stringResource(R.string.open_recommended_articles)) }
-                        items(current.articleLinks, key = { it.feedItemId }) { article ->
-                            TextButton(
-                                onClick = { onOpenArticle(article.feedItemId) },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(article.title, modifier = Modifier.fillMaxWidth())
-                            }
+                    items(current.content) { item ->
+                        when (item) {
+                            is UnreadDigestDisplayContent.Paragraph -> Text(item.value)
+                            is UnreadDigestDisplayContent.ArticleLink ->
+                                TextButton(
+                                    onClick = { onOpenArticle(item.value.feedItemId) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(stringResource(R.string.open_article), modifier = Modifier.fillMaxWidth())
+                                }
                         }
                     }
                 }

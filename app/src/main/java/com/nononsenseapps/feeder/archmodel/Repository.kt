@@ -365,7 +365,10 @@ class Repository(
 
     val openAISettings = settingsStore.openAiSettings
 
-    suspend fun getUnreadDigestPreviews(): List<PreviewItem> = feedItemStore.getUnreadDigestPreviews()
+    suspend fun getUnreadDigestPreviews(): List<PreviewItem> {
+        val (feedId, tag) = currentFeedAndTag.value
+        return feedItemStore.getUnreadDigestPreviews(feedId = feedId, tag = tag)
+    }
 
     fun setOpenAiSettings(value: OpenAISettings) = settingsStore.setOpenAiSettings(value)
 

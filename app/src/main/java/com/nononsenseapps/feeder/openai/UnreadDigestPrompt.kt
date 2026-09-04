@@ -46,7 +46,7 @@ fun buildUnreadDigestPrompt(
 
         Do not favor an article merely because its title is sensational, urgent-sounding, emotionally provocative, or because it comes from a well-known source. Consider all available title, snippet, feed, publication date, and URL metadata together.
 
-        For each selected article, include exactly one marker in the form [[ARTICLE:index]] using the index supplied with that article, include its title, provide a short overview based only on the supplied metadata, and provide one concise sentence explaining the main reason it is worth reading. Only use article indexes that exist in the supplied article list. Do not explain all five criteria for every article. You do not need to summarize every article individually.
+        Format every selected article as its own Markdown block: a heading with its number and title, an "概要" section of about 2 to 4 sentences, a "読む理由" section of about 1 to 3 sentences, and exactly one marker in the form [[ARTICLE:index]] on a separate line at the end of that same article block. Use the index supplied with that article. Place each marker immediately after the corresponding article's explanation. Never collect ARTICLE markers or article links into a list at the end of the digest. Only use article indexes that exist in the supplied article list. Do not explain all five criteria for every article. You do not need to summarize every article individually.
 
         Use Markdown for readability. Do not invent information absent from the title, feed name, publication date, URL, or snippet. Never imply that you read the full article. Make comparisons only within the supplied article set unless the metadata directly supports a broader claim.
 

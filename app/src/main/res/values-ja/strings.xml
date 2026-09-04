@@ -136,6 +136,7 @@
     <string name="only_enable_for_bad_id_feeds">無効なIDを持つフィードのみ有効</string>
     <string name="failed_to_import_OPML">OPMLのインポートに失敗しました</string>
     <string name="failed_to_open_article">記事を開けませんでした</string>
+    <string name="open_article">記事を開く</string>
     <string name="one_unread_article">%1$s件の未読記事</string>
     <string name="generate_extra_unique_ids">ユニークなIDを生成する</string>
     <string name="invalid_url">有効なURLではありません</string>

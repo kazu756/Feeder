@@ -36,6 +36,9 @@ class UnreadDigestGeneratorTest {
         val success = assertIs<UnreadDigestState.Success>(generator.state.value)
         assertEquals(1L, success.articleLinks.single().feedItemId)
         assertEquals("Title", success.articleLinks.single().title)
+        assertIs<UnreadDigestDisplayContent.ArticleLink>(success.content.first())
+        assertEquals(1L, (success.content.first() as UnreadDigestDisplayContent.ArticleLink).value.feedItemId)
+        assertEquals(AnnotatedString("digest"), (success.content.last() as UnreadDigestDisplayContent.Paragraph).value)
         assertEquals(1, requests)
     }
 

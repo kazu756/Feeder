@@ -8,6 +8,7 @@ import com.nononsenseapps.feeder.base.DIAwareViewModel
 import com.nononsenseapps.feeder.openai.OpenAIApi
 import com.nononsenseapps.feeder.openai.UnreadDigestArticle
 import com.nononsenseapps.feeder.openai.UnreadDigestArticleLink
+import com.nononsenseapps.feeder.openai.UnreadDigestContent
 import com.nononsenseapps.feeder.openai.buildUnreadDigestPrompt
 import com.nononsenseapps.feeder.openai.parseUnreadDigestResponse
 import com.nononsenseapps.feeder.ui.compose.text.htmlStringToAnnotatedString
@@ -88,10 +89,20 @@ internal class UnreadDigestGenerator(
                 when (val result = createDigest(prompt)) {
                     is OpenAIApi.UnreadDigestResult.Success -> {
                         val parsed = parseUnreadDigestResponse(result.content, prompt)
+                        val content =
+                            parsed.content.flatMap { item ->
+                                when (item) {
+                                    is UnreadDigestContent.Markdown ->
+                                        render(item.value).map(UnreadDigestDisplayContent::Paragraph)
+                                    is UnreadDigestContent.ArticleLink ->
+                                        listOf(UnreadDigestDisplayContent.ArticleLink(item.value))
+                                }
+                            }
                         mutableState.value =
                             UnreadDigestState.Success(
                                 paragraphs = render(parsed.markdown),
                                 articleLinks = parsed.articleLinks,
+                                content = content,
                             )
                     }
                     is OpenAIApi.UnreadDigestResult.Error -> mutableState.value = UnreadDigestState.Error(result.content)
@@ -114,10 +125,21 @@ sealed interface UnreadDigestState {
     data class Success(
         val paragraphs: List<AnnotatedString>,
         val articleLinks: List<UnreadDigestArticleLink>,
+        val content: List<UnreadDigestDisplayContent>,
     ) : UnreadDigestState
 
     @Immutable
     data class Error(
         val message: String,
     ) : UnreadDigestState
+}
+
+sealed interface UnreadDigestDisplayContent {
+    data class Paragraph(
+        val value: AnnotatedString,
+    ) : UnreadDigestDisplayContent
+
+    data class ArticleLink(
+        val value: UnreadDigestArticleLink,
+    ) : UnreadDigestDisplayContent
 }

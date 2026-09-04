@@ -48,7 +48,10 @@ class FeedItemStore(
     private val settingsStore: SettingsStore by instance()
     private val application: Application by instance()
 
-    suspend fun getUnreadDigestPreviews(): List<PreviewItem> = dao.getUnreadDigestPreviews()
+    suspend fun getUnreadDigestPreviews(
+        feedId: Long,
+        tag: String,
+    ): List<PreviewItem> = dao.getUnreadDigestPreviews(feedId = feedId, tag = tag)
 
     suspend fun setBlockStatusForNewInFeed(
         feedId: Long,

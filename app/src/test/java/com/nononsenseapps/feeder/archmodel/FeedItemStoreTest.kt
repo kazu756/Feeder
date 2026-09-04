@@ -3,6 +3,8 @@ package com.nononsenseapps.feeder.archmodel
 import com.nononsenseapps.feeder.db.room.FeedItemDao
 import com.nononsenseapps.feeder.db.room.FeedItemIdWithLink
 import com.nononsenseapps.feeder.db.room.FeedItemWithFeed
+import com.nononsenseapps.feeder.db.room.ID_ALL_FEEDS
+import com.nononsenseapps.feeder.db.room.ID_UNSET
 import com.nononsenseapps.feeder.model.PreviewItem
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
@@ -98,14 +100,23 @@ class FeedItemStoreTest : DIAware {
     }
 
     @Test
-    fun getUnreadDigestPreviewsIsReadOnlyPassThrough() {
+    fun getUnreadDigestPreviewsPassesAllFeedTagAndSingleFeedScopesWithoutWrites() {
         val expected = listOf(PreviewItem(id = 5L, plainTitle = "Title", plainSnippet = "Snippet"))
-        coEvery { dao.getUnreadDigestPreviews() } returns expected
+        coEvery { dao.getUnreadDigestPreviews(any(), any()) } returns expected
 
-        val actual = runBlocking { store.getUnreadDigestPreviews() }
+        val actual =
+            runBlocking {
+                listOf(
+                    store.getUnreadDigestPreviews(feedId = ID_ALL_FEEDS, tag = ""),
+                    store.getUnreadDigestPreviews(feedId = ID_UNSET, tag = "AI"),
+                    store.getUnreadDigestPreviews(feedId = 7L, tag = ""),
+                )
+            }
 
-        assertEquals(expected, actual)
-        coVerify(exactly = 1) { dao.getUnreadDigestPreviews() }
+        assertEquals(listOf(expected, expected, expected), actual)
+        coVerify(exactly = 1) { dao.getUnreadDigestPreviews(feedId = ID_ALL_FEEDS, tag = "") }
+        coVerify(exactly = 1) { dao.getUnreadDigestPreviews(feedId = ID_UNSET, tag = "AI") }
+        coVerify(exactly = 1) { dao.getUnreadDigestPreviews(feedId = 7L, tag = "") }
         coVerify(exactly = 0) { dao.markAsReadAndNotified(any(), any()) }
     }
 
