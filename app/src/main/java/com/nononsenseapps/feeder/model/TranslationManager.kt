@@ -511,7 +511,8 @@ class TranslationManager(
     ): File {
         val provider =
             providerOverride ?: when {
-                settings.isLocalTranslation -> "local"
+                // Invalidate translations made before short-text and protected-node filtering.
+                settings.isLocalTranslation -> "local-v2"
                 settings.isDeepL -> "deepl"
                 else -> "openai"
             }

@@ -26,7 +26,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jsoup.Jsoup
-import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 import org.kodein.di.DI
 import org.kodein.di.DIAware
@@ -161,12 +160,8 @@ class LocalTranslator(
         val translationTargets =
             document
                 .body()
-                .let(::collectTextNodes)
-                .mapNotNull { textNode ->
-                    HtmlTextNodeTranslation
-                        .from(textNode)
-                        .takeIf { hasEnoughTextForLanguageDetection(it.text) }
-                }
+                .let(::collectTranslatableTextNodes)
+                .map(HtmlTextNodeTranslation::from)
 
         if (translationTargets.isEmpty()) {
             return TranslationResult.Success(
@@ -237,12 +232,8 @@ class LocalTranslator(
         val translationTargets =
             document
                 .body()
-                .let(::collectTextNodes)
-                .mapNotNull { textNode ->
-                    HtmlTextNodeTranslation
-                        .from(textNode)
-                        .takeIf { hasEnoughTextForLanguageDetection(it.text) }
-                }
+                .let(::collectTranslatableTextNodes)
+                .map(HtmlTextNodeTranslation::from)
 
         if (translationTargets.isEmpty()) {
             return TranslationResult.Success(
@@ -515,17 +506,6 @@ class LocalTranslator(
             }
     }
 
-    private fun collectTextNodes(node: Node): List<TextNode> =
-        buildList {
-            fun visit(current: Node) {
-                if (current is TextNode) {
-                    add(current)
-                }
-                current.childNodes().forEach(::visit)
-            }
-            visit(node)
-        }
-
     private fun detectSourceLanguage(
         content: String,
         preserveHtml: Boolean,
@@ -602,7 +582,7 @@ private fun Collection<TranslationCapability>.toDebugSummary(): String =
             capability.state.translationCapabilityStateName()
     }
 
-private data class HtmlTextNodeTranslation(
+internal data class HtmlTextNodeTranslation(
     val textNode: TextNode,
     val leadingWhitespace: String,
     val text: String,
