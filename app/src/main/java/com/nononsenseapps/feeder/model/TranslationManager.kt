@@ -509,13 +509,7 @@ class TranslationManager(
         targetLanguage: String,
         providerOverride: String? = null,
     ): File {
-        val provider =
-            providerOverride ?: when {
-                // Invalidate translations made before short-text and protected-node filtering.
-                settings.isLocalTranslation -> "local-v2"
-                settings.isDeepL -> "deepl"
-                else -> "openai"
-            }
+        val provider = translationCacheProvider(settings, providerOverride)
         return filePathProvider.cacheDir
             .resolve("translations")
             .resolve(
@@ -786,3 +780,14 @@ data class CachedFeedListItemTranslation(
     val hasCachedTranslation: Boolean,
     val isFullyCached: Boolean,
 )
+
+internal fun translationCacheProvider(
+    settings: OpenAISettings,
+    providerOverride: String? = null,
+): String =
+    providerOverride ?: when {
+        // Block HTML translation must not reuse the TextNode-only local-v2 cache.
+        settings.isLocalTranslation -> "local-v3"
+        settings.isDeepL -> "deepl"
+        else -> "openai"
+    }

@@ -21,6 +21,7 @@ import com.nononsenseapps.feeder.model.prepareTextSamplesForLanguageDetection
 import com.nononsenseapps.feeder.openai.OpenAIApi.TranslationResult
 import com.nononsenseapps.feeder.openai.OpenAIApi.TranslationResult.ErrorAction
 import com.nononsenseapps.feeder.util.logDebug
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -228,14 +229,7 @@ class LocalTranslator(
         sourceLang: String,
         targetLang: String,
     ): TranslationResult {
-        val document = Jsoup.parseBodyFragment(html)
-        val translationTargets =
-            document
-                .body()
-                .let(::collectTranslatableTextNodes)
-                .map(HtmlTextNodeTranslation::from)
-
-        if (translationTargets.isEmpty()) {
+        if (collectTranslatableTextNodes(Jsoup.parseBodyFragment(html).body()).isEmpty()) {
             return TranslationResult.Success(
                 content = html,
                 detectedLanguage = sourceLang,
@@ -244,19 +238,16 @@ class LocalTranslator(
 
         val translatedTexts =
             translateTextValuesWithBergamot(
-                content = translationTargets.map(HtmlTextNodeTranslation::text),
+                content = listOf(html),
                 sourceLang = sourceLang,
                 targetLang = targetLang,
-                preserveHtml = false,
+                preserveHtml = true,
             )
 
         return when (translatedTexts) {
             is LocalTranslationResult.Success -> {
-                translationTargets.zip(translatedTexts.values).forEach { (target, translatedText) ->
-                    target.textNode.text(target.leadingWhitespace + translatedText + target.trailingWhitespace)
-                }
                 TranslationResult.Success(
-                    content = document.body().html(),
+                    content = translatedTexts.values.single(),
                     detectedLanguage = sourceLang,
                 )
             }
@@ -339,26 +330,35 @@ class LocalTranslator(
             }
 
         return try {
-            when (
-                val result =
-                    withTimeoutOrNull(TRANSLATION_TIMEOUT_MS) {
+            // Prepare/check the model once per article, not once per HTML block.
+            suspend fun translateBatch(
+                texts: List<String>,
+                html: Boolean,
+            ): List<String> =
+                when (
+                    val result =
                         bergamotWebTranslator.translate(
-                            content = content,
+                            content = texts,
                             sourceLanguage = sourceLang,
                             targetLanguage = targetLang,
-                            preserveHtml = preserveHtml,
+                            preserveHtml = html,
                             modelRegistry = modelRegistry,
                         )
-                    } ?: return LocalTranslationResult.Error(
-                        application.getString(R.string.bergamot_translation_timed_out),
-                    )
-            ) {
-                is BergamotWebTranslationResult.Success -> LocalTranslationResult.Success(result.values)
-                is BergamotWebTranslationResult.Error ->
-                    LocalTranslationResult.Error(
-                        result.message.toLocalTranslationError(R.string.bergamot_translation_failed),
-                    )
-            }
+                ) {
+                    is BergamotWebTranslationResult.Success -> result.values
+                    is BergamotWebTranslationResult.Error -> throw IllegalStateException(result.message)
+                }
+            val values =
+                withTimeoutOrNull(TRANSLATION_TIMEOUT_MS) {
+                    if (preserveHtml) {
+                        content.map { translateBergamotHtml(it, ::translateBatch) }
+                    } else {
+                        translateBatch(content, false)
+                    }
+                } ?: return LocalTranslationResult.Error(application.getString(R.string.bergamot_translation_timed_out))
+            LocalTranslationResult.Success(values)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             LocalTranslationResult.Error(
                 e.message.orEmpty().toLocalTranslationError(R.string.bergamot_translation_failed),
@@ -464,6 +464,8 @@ class LocalTranslator(
                 }
 
             LocalTranslationResult.Success(translatedTexts)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: IllegalStateException) {
             val message = e.message.orEmpty()
             if (message.contains("destroyed", ignoreCase = true)) {
