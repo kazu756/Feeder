@@ -137,6 +137,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val viewState by settingsViewModel.viewState.collectAsStateWithLifecycle()
+    val commaFeedState by settingsViewModel.commaFeedDiagnosticState.collectAsStateWithLifecycle()
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
@@ -264,6 +265,14 @@ fun SettingsScreen(
             forceSingleColumn = viewState.forceSingleColumn,
             onForceSingleColumnChange = settingsViewModel::setForceSingleColumn,
             modifier = Modifier.padding(padding),
+            commaFeedSection = {
+                CommaFeedDiagnosticSection(
+                    initialBaseUrl = settingsViewModel.commaFeedBaseUrl,
+                    initialUsername = settingsViewModel.commaFeedUsername,
+                    state = commaFeedState,
+                    onRun = settingsViewModel::runCommaFeedDiagnostic,
+                )
+            },
         )
     }
 }
@@ -450,6 +459,7 @@ fun SettingsList(
     forceSingleColumn: Boolean,
     onForceSingleColumnChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    commaFeedSection: @Composable () -> Unit = {},
 ) {
     val scrollState = rememberScrollState()
     val dimens = LocalDimens.current
@@ -948,6 +958,9 @@ fun SettingsList(
         )
 
         HorizontalDivider(modifier = Modifier.width(dimens.maxContentWidth))
+
+        HorizontalDivider(modifier = Modifier.width(dimens.maxContentWidth))
+        commaFeedSection()
 
         Spacer(modifier = Modifier.navigationBarsPadding())
     }

@@ -1,5 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="commafeed_experimental">CommaFeed (Experimental)</string>
+  <string name="commafeed_read_only_description">Read-only article matching diagnostic. This does not change read status. Local scope: up to 1000 newest local articles in feeds with exactly matching URLs. HTTP sends your password without TLS; use only a trusted LAN.</string>
+  <string name="commafeed_base_url">Base URL</string>
+  <string name="commafeed_username">Username</string>
+  <string name="commafeed_credential">Password</string>
+  <string name="commafeed_credential_note">Password is used for this run only and is not saved.</string>
+  <string name="commafeed_run_diagnostic">Check article matching (read-only)</string>
+  <string name="commafeed_running">Connecting and comparing…</string>
+  <string name="commafeed_connection_success">Connection: Success</string>
+  <string name="commafeed_connection_failed">Connection: Failed</string>
+  <string name="commafeed_read">read</string>
+  <string name="commafeed_unread">unread</string>
+  <string name="commafeed_scope">Remote scope: first up to 1000 entries returned by CommaFeed (order=desc), in 500-entry pages.</string>
+  <string name="commafeed_remote_fetched">Remote entries fetched: %1$d</string>
+  <string name="commafeed_local_considered">Local articles considered: %1$d</string>
+  <string name="commafeed_matched">Matched total: %1$d</string>
+  <string name="commafeed_guid">Matched by GUID: %1$d</string>
+  <string name="commafeed_url">Matched by exact article URL: %1$d</string>
+  <string name="commafeed_ambiguous">Ambiguous: local %1$d, remote %2$d</string>
+  <string name="commafeed_local_only">Local only / unmatched: %1$d</string>
+  <string name="commafeed_remote_only">Remote only / unmatched: %1$d</string>
+  <string name="commafeed_read_same">Read state same: %1$d</string>
+  <string name="commafeed_read_different">Read state different: %1$d</string>
+  <string name="commafeed_local_rate">Local match rate (matched / local considered): %1$s%%</string>
+  <string name="commafeed_remote_rate">Remote match rate (matched / remote fetched): %1$s%%</string>
+  <string name="commafeed_no_matching_feeds">No matching feeds in this diagnostic scope.</string>
+  <string name="commafeed_no_matching_articles">No matching articles in this diagnostic scope.</string>
+  <string name="commafeed_connection_refused">Connection refused. Check the server address and Docker port.</string>
+  <string name="commafeed_timeout">Connection timed out.</string>
+  <string name="commafeed_authentication_failed">Authentication failed (HTTP 401/403).</string>
+  <string name="commafeed_http_error">CommaFeed returned an HTTP error.</string>
+  <string name="commafeed_invalid_response">CommaFeed returned an invalid response.</string>
+  <string name="commafeed_pagination_error">CommaFeed pagination response was inconsistent.</string>
+  <string name="commafeed_invalid_url">Invalid base URL. Enter the server origin only.</string>
+  <string name="commafeed_partial_failure">Diagnostic failed after connecting. No read state was changed.</string>
+  <string name="commafeed_local_only_reason">Local only</string>
+  <string name="commafeed_remote_only_reason">Remote only</string>
+  <string name="commafeed_ambiguous_reason">Ambiguous</string>
+  <string name="commafeed_read_mismatch_reason">Read mismatch</string>
+  <string name="commafeed_detail">%1$s · %2$s — %3$s (local read: %4$s, remote read: %5$s)</string>
 
   <string name="navigation_drawer_open">Open navigation drawer</string>
   <string name="navigation_drawer_close">Close navigation drawer</string>

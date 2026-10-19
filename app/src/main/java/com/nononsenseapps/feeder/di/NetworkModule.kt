@@ -1,5 +1,7 @@
 package com.nononsenseapps.feeder.di
 
+import com.nononsenseapps.feeder.commafeed.CommaFeedDiagnosticService
+import com.nononsenseapps.feeder.commafeed.CommaFeedRestClient
 import com.nononsenseapps.feeder.model.FeedParser
 import com.nononsenseapps.feeder.model.FullTextParser
 import com.nononsenseapps.feeder.model.RssLocalSync
@@ -23,6 +25,8 @@ val networkModule =
         bind<FeedParser>() with provider { FeedParser(di) }
         // These don't have state issues
         bind<SyncRestClient>() with singleton { SyncRestClient(di) }
+        bind<CommaFeedRestClient>() with singleton { CommaFeedRestClient(instance()) }
+        bind<CommaFeedDiagnosticService>() with singleton { CommaFeedDiagnosticService(di) }
         bind<RssLocalSync>() with singleton { RssLocalSync(di) }
         bind<FullTextParser>() with singleton { FullTextParser(di) }
     }

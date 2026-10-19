@@ -1,5 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="commafeed_experimental">CommaFeed（試験的機能）</string>
+    <string name="commafeed_read_only_description">記事の対応を読み取り専用で診断します。既読状態は変更しません。ローカル側はURLが完全一致するフィードの新しい記事を最大1000件調べます。HTTPではパスワードが暗号化されないため、信頼できるLANでのみ使用してください。</string>
+    <string name="commafeed_base_url">ベースURL</string>
+    <string name="commafeed_username">ユーザー名</string>
+    <string name="commafeed_credential">パスワード</string>
+    <string name="commafeed_credential_note">パスワードは今回の診断にのみ使用し、保存しません。</string>
+    <string name="commafeed_run_diagnostic">CommaFeedとの対応を確認（読み取り専用）</string>
+    <string name="commafeed_running">接続して照合中…</string>
+    <string name="commafeed_connection_success">接続：成功</string>
+    <string name="commafeed_connection_failed">接続：失敗</string>
+    <string name="commafeed_read">既読</string>
+    <string name="commafeed_unread">未読</string>
+    <string name="commafeed_scope">リモートの範囲：CommaFeed APIが返す最初の最大1000件（order=desc）、500件ずつ取得。</string>
+    <string name="commafeed_remote_fetched">取得したリモート記事：%1$d件</string>
+    <string name="commafeed_local_considered">照合対象のローカル記事：%1$d件</string>
+    <string name="commafeed_matched">一致：%1$d件</string>
+    <string name="commafeed_guid">GUID一致：%1$d件</string>
+    <string name="commafeed_url">記事URL完全一致：%1$d件</string>
+    <string name="commafeed_ambiguous">曖昧：ローカル%1$d件、リモート%2$d件</string>
+    <string name="commafeed_local_only">ローカルのみ・未一致：%1$d件</string>
+    <string name="commafeed_remote_only">リモートのみ・未一致：%1$d件</string>
+    <string name="commafeed_read_same">既読状態が同じ：%1$d件</string>
+    <string name="commafeed_read_different">既読状態が異なる：%1$d件</string>
+    <string name="commafeed_local_rate">ローカル一致率（一致／照合対象）：%1$s%%</string>
+    <string name="commafeed_remote_rate">リモート一致率（一致／取得数）：%1$s%%</string>
+    <string name="commafeed_no_matching_feeds">今回の範囲に一致するフィードがありません。</string>
+    <string name="commafeed_no_matching_articles">今回の範囲に一致する記事がありません。</string>
+    <string name="commafeed_connection_refused">接続が拒否されました。サーバーのアドレスとDockerのポートを確認してください。</string>
+    <string name="commafeed_timeout">接続がタイムアウトしました。</string>
+    <string name="commafeed_authentication_failed">認証に失敗しました（HTTP 401/403）。</string>
+    <string name="commafeed_http_error">CommaFeedがHTTPエラーを返しました。</string>
+    <string name="commafeed_invalid_response">CommaFeedの応答が不正です。</string>
+    <string name="commafeed_pagination_error">CommaFeedのページング応答に矛盾があります。</string>
+    <string name="commafeed_invalid_url">ベースURLが不正です。サーバーのURLだけ入力してください。</string>
+    <string name="commafeed_partial_failure">接続後に診断が失敗しました。既読状態は変更していません。</string>
+    <string name="commafeed_local_only_reason">ローカルのみ</string>
+    <string name="commafeed_remote_only_reason">リモートのみ</string>
+    <string name="commafeed_ambiguous_reason">曖昧</string>
+    <string name="commafeed_read_mismatch_reason">既読状態の差異</string>
+    <string name="commafeed_detail">%1$s · %2$s — %3$s（ローカル既読：%4$s、リモート既読：%5$s）</string>
     <string name="navigation_drawer_open">ナビゲーションドロワーを開く</string>
     <string name="navigation_drawer_close">ナビゲーションドロワーを閉じる</string>
     <string name="action_settings">設定</string>

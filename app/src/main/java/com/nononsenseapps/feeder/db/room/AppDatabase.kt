@@ -51,11 +51,12 @@ private const val LOG_TAG = "FEEDER_APPDB"
         RemoteReadMark::class,
         RemoteFeed::class,
         SyncDevice::class,
+        CommaFeedArticleMapping::class,
     ],
     views = [
         FeedsWithItemsForNavDrawer::class,
     ],
-    version = 39,
+    version = 40,
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -74,6 +75,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun remoteFeedDao(): RemoteFeedDao
 
     abstract fun syncDeviceDao(): SyncDeviceDao
+
+    abstract fun commaFeedArticleMappingDao(): CommaFeedArticleMappingDao
 
     companion object {
         // For Singleton instantiation
@@ -139,6 +142,7 @@ fun getAllMigrations(di: DI) =
         MigrationFrom36To37(di),
         MigrationFrom37To38(di),
         MIGRATION_38_39,
+        MIGRATION_39_40,
     )
 
 /*
@@ -213,6 +217,17 @@ object MIGRATION_38_39 : Migration(38, 39) {
             ALTER TABLE feeds ADD COLUMN fetch_og_images INTEGER NOT NULL DEFAULT 0
             """.trimIndent(),
         )
+    }
+}
+
+@Suppress("ClassName")
+object MIGRATION_39_40 : Migration(39, 40) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """CREATE TABLE IF NOT EXISTS `commafeed_article_mapping` (`server_key` TEXT NOT NULL, `local_article_id` INTEGER NOT NULL, `remote_article_id` TEXT NOT NULL, `local_feed_id` INTEGER NOT NULL, `remote_feed_id` TEXT, `match_type` TEXT NOT NULL, `matched_at` INTEGER NOT NULL, `last_observed_local_read` INTEGER NOT NULL, `last_observed_remote_read` INTEGER NOT NULL, `last_observed_at` INTEGER NOT NULL, `baseline_read` INTEGER, `pending_desired_read` INTEGER, PRIMARY KEY(`server_key`, `local_article_id`), FOREIGN KEY(`local_article_id`) REFERENCES `feed_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )""",
+        )
+        database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_commafeed_article_mapping_server_key_remote_article_id` ON `commafeed_article_mapping` (`server_key`, `remote_article_id`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_commafeed_article_mapping_local_article_id` ON `commafeed_article_mapping` (`local_article_id`)")
     }
 }
 
