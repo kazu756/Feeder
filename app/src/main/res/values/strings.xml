@@ -40,6 +40,20 @@
   <string name="commafeed_ambiguous_reason">Ambiguous</string>
   <string name="commafeed_read_mismatch_reason">Read mismatch</string>
   <string name="commafeed_detail">%1$s · %2$s — %3$s (local read: %4$s, remote read: %5$s)</string>
+  <string name="commafeed_sync_description">Manual read-only-direction sync for safely matched articles. Either side being read marks the other as read. Unmatched and ambiguous articles are skipped.</string>
+  <string name="commafeed_sync_read">Sync read state with CommaFeed</string>
+  <string name="commafeed_sync_running">Syncing read state…</string>
+  <string name="commafeed_sync_complete">Read sync finished</string>
+  <string name="commafeed_sync_already_same">Already same: %1$d</string>
+  <string name="commafeed_sync_local_marked">FeederD marked read: %1$d</string>
+  <string name="commafeed_sync_remote_marked">CommaFeed marked read: %1$d</string>
+  <string name="commafeed_sync_failed_writes">Failed writes: FeederD %1$d, CommaFeed %2$d</string>
+  <string name="commafeed_sync_network_error">Network failure before synchronization.</string>
+  <string name="commafeed_sync_fetch_error">CommaFeed article fetch failed.</string>
+  <string name="commafeed_sync_processing_error">Read sync processing failed.</string>
+  <string name="commafeed_sync_remote_write_error">Some CommaFeed mark-read writes failed or could not be confirmed.</string>
+  <string name="commafeed_sync_local_write_error">Some FeederD mark-read writes failed.</string>
+  <string name="commafeed_sync_verification_error">Could not re-fetch CommaFeed entries to verify remote writes.</string>
 
   <string name="navigation_drawer_open">Open navigation drawer</string>
   <string name="navigation_drawer_close">Close navigation drawer</string>

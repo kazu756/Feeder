@@ -138,6 +138,7 @@ fun SettingsScreen(
 ) {
     val viewState by settingsViewModel.viewState.collectAsStateWithLifecycle()
     val commaFeedState by settingsViewModel.commaFeedDiagnosticState.collectAsStateWithLifecycle()
+    val commaFeedSyncState by settingsViewModel.commaFeedReadSyncState.collectAsStateWithLifecycle()
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
@@ -270,7 +271,9 @@ fun SettingsScreen(
                     initialBaseUrl = settingsViewModel.commaFeedBaseUrl,
                     initialUsername = settingsViewModel.commaFeedUsername,
                     state = commaFeedState,
+                    syncState = commaFeedSyncState,
                     onRun = settingsViewModel::runCommaFeedDiagnostic,
+                    onSync = settingsViewModel::runCommaFeedReadSync,
                 )
             },
         )

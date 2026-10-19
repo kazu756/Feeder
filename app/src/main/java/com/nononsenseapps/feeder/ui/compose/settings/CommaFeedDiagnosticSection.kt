@@ -26,7 +26,9 @@ fun CommaFeedDiagnosticSection(
     initialBaseUrl: String,
     initialUsername: String,
     state: CommaFeedDiagnosticState,
+    syncState: CommaFeedReadSyncState,
     onRun: (String, String, String) -> Unit,
+    onSync: (String, String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var baseUrl by remember { mutableStateOf(initialBaseUrl) }
@@ -66,9 +68,62 @@ fun CommaFeedDiagnosticSection(
                     onRun(baseUrl, username, password)
                     password = ""
                 },
-                enabled = state !is CommaFeedDiagnosticState.Running && baseUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
+                enabled =
+                    state !is CommaFeedDiagnosticState.Running &&
+                        syncState !is CommaFeedReadSyncState.Running &&
+                        baseUrl.isNotBlank() &&
+                        username.isNotBlank() &&
+                        password.isNotBlank(),
             ) {
                 Text(stringResource(R.string.commafeed_run_diagnostic))
+            }
+            Text(stringResource(R.string.commafeed_sync_description), style = MaterialTheme.typography.bodySmall)
+            Button(
+                onClick = {
+                    onSync(baseUrl, username, password)
+                    password = ""
+                },
+                enabled =
+                    state !is CommaFeedDiagnosticState.Running &&
+                        syncState !is CommaFeedReadSyncState.Running &&
+                        baseUrl.isNotBlank() &&
+                        username.isNotBlank() &&
+                        password.isNotBlank(),
+            ) {
+                Text(stringResource(R.string.commafeed_sync_read))
+            }
+            when (val current = syncState) {
+                CommaFeedReadSyncState.Idle -> Unit
+                CommaFeedReadSyncState.Running -> Text(stringResource(R.string.commafeed_sync_running))
+                is CommaFeedReadSyncState.Failed -> {
+                    val error =
+                        when (current.error) {
+                            CommaFeedReadSyncError.INVALID_URL -> R.string.commafeed_invalid_url
+                            CommaFeedReadSyncError.AUTHENTICATION -> R.string.commafeed_authentication_failed
+                            CommaFeedReadSyncError.NETWORK -> R.string.commafeed_sync_network_error
+                            CommaFeedReadSyncError.FETCH_HTTP -> R.string.commafeed_sync_fetch_error
+                            CommaFeedReadSyncError.MALFORMED_RESPONSE -> R.string.commafeed_invalid_response
+                            CommaFeedReadSyncError.PROCESSING -> R.string.commafeed_sync_processing_error
+                        }
+                    Text(stringResource(error), color = MaterialTheme.colorScheme.error)
+                }
+                is CommaFeedReadSyncState.Success -> {
+                    val result = current.result
+                    Text(stringResource(R.string.commafeed_sync_complete))
+                    Text(stringResource(R.string.commafeed_remote_fetched, result.remoteFetched))
+                    Text(stringResource(R.string.commafeed_local_considered, result.localConsidered))
+                    Text(stringResource(R.string.commafeed_matched, result.matched))
+                    Text(stringResource(R.string.commafeed_sync_already_same, result.alreadySame))
+                    Text(stringResource(R.string.commafeed_sync_local_marked, result.localMarkedRead))
+                    Text(stringResource(R.string.commafeed_sync_remote_marked, result.remoteMarkedRead))
+                    Text(stringResource(R.string.commafeed_ambiguous, result.ambiguousLocal, result.ambiguousRemote))
+                    Text(stringResource(R.string.commafeed_local_only, result.unmatchedLocal))
+                    Text(stringResource(R.string.commafeed_remote_only, result.unmatchedRemote))
+                    Text(stringResource(R.string.commafeed_sync_failed_writes, result.localFailedWrites, result.remoteFailedWrites))
+                    if (result.remoteFailedWrites > 0) Text(stringResource(R.string.commafeed_sync_remote_write_error), color = MaterialTheme.colorScheme.error)
+                    if (result.localFailedWrites > 0) Text(stringResource(R.string.commafeed_sync_local_write_error), color = MaterialTheme.colorScheme.error)
+                    if (result.remoteVerificationFailed) Text(stringResource(R.string.commafeed_sync_verification_error), color = MaterialTheme.colorScheme.error)
+                }
             }
             when (val current = state) {
                 CommaFeedDiagnosticState.Idle -> Unit

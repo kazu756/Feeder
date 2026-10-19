@@ -5,8 +5,11 @@ import kotlinx.coroutines.withContext
 import okhttp3.Credentials
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
@@ -28,7 +31,7 @@ sealed class CommaFeedFailure(
 
 class InvalidCommaFeedBaseUrl : IllegalArgumentException("Invalid base URL")
 
-/** GET-only Phase 1 client. No state-changing endpoint is exposed here. */
+/** CommaFeed client with read-only fetch and read-only-direction writes. */
 class CommaFeedRestClient(
     okHttpClient: OkHttpClient,
 ) {
@@ -54,6 +57,33 @@ class CommaFeedRestClient(
         if (url.encodedQuery != null || url.encodedFragment != null) throw InvalidCommaFeedBaseUrl()
         if (url.encodedPath != "/") throw InvalidCommaFeedBaseUrl()
         return url
+    }
+
+    suspend fun markRead(
+        baseUrl: String,
+        username: String,
+        password: String,
+        ids: List<String>,
+    ) = withContext(Dispatchers.IO) {
+        require(ids.isNotEmpty() && ids.all { it.isNotBlank() })
+        val endpoint = normalizedBaseUrl(baseUrl).newBuilder().addPathSegments("rest/entry/markMultiple").build()
+        val requests = JSONArray()
+        ids.forEach { id -> requests.put(JSONObject().put("id", id).put("read", true)) }
+        val body = JSONObject().put("requests", requests).toString().toRequestBody("application/json".toMediaType())
+        val request =
+            Request
+                .Builder()
+                .url(endpoint)
+                .post(body)
+                .header("Authorization", Credentials.basic(username, password))
+                .build()
+        client.newCall(request).execute().use { response ->
+            when (response.code) {
+                401, 403 -> throw CommaFeedFailure.Authentication()
+                in 300..399 -> throw CommaFeedFailure.Http(response.code)
+            }
+            if (!response.isSuccessful) throw CommaFeedFailure.Http(response.code)
+        }
     }
 
     suspend fun fetch(

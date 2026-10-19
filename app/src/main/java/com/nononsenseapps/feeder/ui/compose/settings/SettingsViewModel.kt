@@ -19,6 +19,7 @@ import com.nononsenseapps.feeder.archmodel.ThemeOptions
 import com.nononsenseapps.feeder.base.DIAwareViewModel
 import com.nononsenseapps.feeder.commafeed.CommaFeedDiagnosticService
 import com.nononsenseapps.feeder.commafeed.CommaFeedFailure
+import com.nononsenseapps.feeder.commafeed.CommaFeedReadSyncService
 import com.nononsenseapps.feeder.commafeed.InvalidCommaFeedBaseUrl
 import com.nononsenseapps.feeder.localtranslation.BergamotModelManager
 import com.nononsenseapps.feeder.localtranslation.LanguagePairInfo
@@ -39,6 +40,7 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import org.kodein.di.DI
 import org.kodein.di.instance
+import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 
@@ -51,24 +53,27 @@ class SettingsViewModel(
     private val openAIApi: OpenAIApi by instance()
     private val bergamotModelManager: BergamotModelManager by instance()
     private val commaFeedDiagnosticService: CommaFeedDiagnosticService by instance()
+    private val commaFeedReadSyncService: CommaFeedReadSyncService by instance()
 
     private val commaFeedPrefs by lazy { context.getSharedPreferences("commafeed_diagnostic", 0) }
     val commaFeedBaseUrl: String get() = commaFeedPrefs.getString("base_url", "") ?: ""
     val commaFeedUsername: String get() = commaFeedPrefs.getString("username", "") ?: ""
     val commaFeedDiagnosticState = MutableStateFlow<CommaFeedDiagnosticState>(CommaFeedDiagnosticState.Idle)
+    val commaFeedReadSyncState = MutableStateFlow<CommaFeedReadSyncState>(CommaFeedReadSyncState.Idle)
 
     fun runCommaFeedDiagnostic(
         baseUrl: String,
         username: String,
         password: String,
     ) {
-        if (commaFeedDiagnosticState.value is CommaFeedDiagnosticState.Running) return
+        if (commaFeedDiagnosticState.value is CommaFeedDiagnosticState.Running || commaFeedReadSyncState.value is CommaFeedReadSyncState.Running) return
         commaFeedPrefs
             .edit()
             .putString("base_url", baseUrl.trim())
             .putString("username", username.trim())
             .apply()
         viewModelScope.launch {
+            commaFeedReadSyncState.value = CommaFeedReadSyncState.Idle
             commaFeedDiagnosticState.value = CommaFeedDiagnosticState.Running
             try {
                 val result = commaFeedDiagnosticService.run(baseUrl, username, password)
@@ -88,6 +93,39 @@ class SettingsViewModel(
                         else -> CommaFeedDiagnosticError.PARTIAL_FAILURE
                     }
                 commaFeedDiagnosticState.value = CommaFeedDiagnosticState.Failed(error)
+            }
+        }
+    }
+
+    fun runCommaFeedReadSync(
+        baseUrl: String,
+        username: String,
+        password: String,
+    ) {
+        if (commaFeedDiagnosticState.value is CommaFeedDiagnosticState.Running || commaFeedReadSyncState.value is CommaFeedReadSyncState.Running) return
+        commaFeedPrefs
+            .edit()
+            .putString("base_url", baseUrl.trim())
+            .putString("username", username.trim())
+            .apply()
+        viewModelScope.launch {
+            commaFeedDiagnosticState.value = CommaFeedDiagnosticState.Idle
+            commaFeedReadSyncState.value = CommaFeedReadSyncState.Running
+            try {
+                commaFeedReadSyncState.value = CommaFeedReadSyncState.Success(commaFeedReadSyncService.run(baseUrl, username, password))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val error =
+                    when (e) {
+                        is InvalidCommaFeedBaseUrl -> CommaFeedReadSyncError.INVALID_URL
+                        is CommaFeedFailure.Authentication -> CommaFeedReadSyncError.AUTHENTICATION
+                        is CommaFeedFailure.InvalidResponse, is CommaFeedFailure.Pagination -> CommaFeedReadSyncError.MALFORMED_RESPONSE
+                        is CommaFeedFailure.Http -> CommaFeedReadSyncError.FETCH_HTTP
+                        is IOException -> CommaFeedReadSyncError.NETWORK
+                        else -> CommaFeedReadSyncError.PROCESSING
+                    }
+                commaFeedReadSyncState.value = CommaFeedReadSyncState.Failed(error)
             }
         }
     }
