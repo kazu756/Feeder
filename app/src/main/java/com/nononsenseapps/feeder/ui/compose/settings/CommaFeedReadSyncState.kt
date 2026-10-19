@@ -17,6 +17,9 @@ sealed interface CommaFeedReadSyncState {
 }
 
 enum class CommaFeedReadSyncError {
+    MISSING_CONFIGURATION,
+    CREDENTIAL_UNAVAILABLE,
+    EMPTY_PASSWORD,
     INVALID_URL,
     AUTHENTICATION,
     NETWORK,

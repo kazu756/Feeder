@@ -1,6 +1,9 @@
 package com.nononsenseapps.feeder.di
 
+import android.app.Application
+import com.nononsenseapps.feeder.commafeed.CommaFeedCredentialStore
 import com.nononsenseapps.feeder.commafeed.CommaFeedDiagnosticService
+import com.nononsenseapps.feeder.commafeed.CommaFeedManualSync
 import com.nononsenseapps.feeder.commafeed.CommaFeedReadSyncService
 import com.nononsenseapps.feeder.commafeed.CommaFeedRestClient
 import com.nononsenseapps.feeder.model.FeedParser
@@ -27,6 +30,8 @@ val networkModule =
         // These don't have state issues
         bind<SyncRestClient>() with singleton { SyncRestClient(di) }
         bind<CommaFeedRestClient>() with singleton { CommaFeedRestClient(instance()) }
+        bind<CommaFeedCredentialStore>() with singleton { CommaFeedCredentialStore(instance<Application>()) }
+        bind<CommaFeedManualSync>() with singleton { CommaFeedManualSync(di) }
         bind<CommaFeedDiagnosticService>() with singleton { CommaFeedDiagnosticService(di) }
         bind<CommaFeedReadSyncService>() with singleton { CommaFeedReadSyncService(di) }
         bind<RssLocalSync>() with singleton { RssLocalSync(di) }

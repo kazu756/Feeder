@@ -5,7 +5,7 @@
   <string name="commafeed_base_url">Base URL</string>
   <string name="commafeed_username">Username</string>
   <string name="commafeed_credential">Password</string>
-  <string name="commafeed_credential_note">Password is used for this run only and is not saved.</string>
+  <string name="commafeed_credential_note">Saving is optional. Saved passwords are encrypted on this device. HTTP does not encrypt network traffic.</string>
   <string name="commafeed_run_diagnostic">Check article matching (read-only)</string>
   <string name="commafeed_running">Connecting and comparing…</string>
   <string name="commafeed_connection_success">Connection: Success</string>
@@ -29,7 +29,7 @@
   <string name="commafeed_no_matching_articles">No matching articles in this diagnostic scope.</string>
   <string name="commafeed_connection_refused">Connection refused. Check the server address and Docker port.</string>
   <string name="commafeed_timeout">Connection timed out.</string>
-  <string name="commafeed_authentication_failed">Authentication failed (HTTP 401/403).</string>
+  <string name="commafeed_authentication_failed">Authentication failed. Enter the password again; any saved password has been removed.</string>
   <string name="commafeed_http_error">CommaFeed returned an HTTP error.</string>
   <string name="commafeed_invalid_response">CommaFeed returned an invalid response.</string>
   <string name="commafeed_pagination_error">CommaFeed pagination response was inconsistent.</string>
@@ -468,4 +468,14 @@
   <string name="no_unread_articles">There are no unread articles</string>
   <string name="retry">Retry</string>
   <string name="open_recommended_articles">Open recommended articles</string>
+    <string name="commafeed_manual_sync">Sync with CommaFeed</string>
+    <string name="commafeed_save_password">Save password on this device</string>
+    <string name="commafeed_password_saved">Password saved (enter a new password to replace it)</string>
+    <string name="commafeed_delete_password">Delete saved password</string>
+    <string name="commafeed_missing_configuration">Configure the CommaFeed Base URL and username in Settings first.</string>
+    <string name="commafeed_credential_unavailable">Unable to use or save the CommaFeed password. Please enter it again.</string>
+    <string name="commafeed_empty_password">Enter a CommaFeed password.</string>
+    <string name="commafeed_manual_complete">CommaFeed sync complete. FeederD: %1$d / CommaFeed: %2$d</string>
+    <string name="commafeed_manual_unchanged">CommaFeed sync complete (no changes)</string>
+    <string name="commafeed_manual_partial">CommaFeed sync finished. %1$d successful / %2$d failed</string>
 </resources>

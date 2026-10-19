@@ -61,6 +61,7 @@ class FeedViewModel(
     private val state: SavedStateHandle,
 ) : DIAwareViewModel(di),
     FeedListFilterCallback {
+    val commaFeed: com.nononsenseapps.feeder.commafeed.CommaFeedManualSync by instance()
     private val repository: Repository by instance()
     private val ttsStateHolder: TTSStateHolder by instance()
     private val podcastPlayerStateHolder: PodcastPlayerStateHolder by instance()

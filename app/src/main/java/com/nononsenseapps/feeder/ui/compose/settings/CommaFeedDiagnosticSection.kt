@@ -1,13 +1,16 @@
 package com.nononsenseapps.feeder.ui.compose.settings
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,13 +30,16 @@ fun CommaFeedDiagnosticSection(
     initialUsername: String,
     state: CommaFeedDiagnosticState,
     syncState: CommaFeedReadSyncState,
-    onRun: (String, String, String) -> Unit,
-    onSync: (String, String, String) -> Unit,
+    saved: Boolean,
+    busy: Boolean,
+    onClearPassword: () -> Unit,
+    onRun: (String, String, String, Boolean) -> Unit,
+    onSync: (String, String, String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var baseUrl by remember { mutableStateOf(initialBaseUrl) }
     var username by remember { mutableStateOf(initialUsername) }
-    // Password exists only in this composable's memory, never in preferences or saved state.
+    var savePassword by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
 
     SettingsGroup(title = R.string.commafeed_experimental) {
@@ -59,36 +65,47 @@ fun CommaFeedDiagnosticSection(
                 onValueChange = { password = it },
                 label = { Text(stringResource(R.string.commafeed_credential)) },
                 visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Row {
+                Checkbox(checked = savePassword, onCheckedChange = { savePassword = it }, enabled = !busy)
+                Text(stringResource(R.string.commafeed_save_password))
+            }
+            if (saved) {
+                Text(stringResource(R.string.commafeed_password_saved))
+                TextButton(onClick = onClearPassword, enabled = !busy) {
+                    Text(stringResource(R.string.commafeed_delete_password))
+                }
+            }
             Text(stringResource(R.string.commafeed_credential_note), style = MaterialTheme.typography.bodySmall)
             Button(
                 onClick = {
-                    onRun(baseUrl, username, password)
+                    onRun(baseUrl, username, password, savePassword)
                     password = ""
                 },
                 enabled =
-                    state !is CommaFeedDiagnosticState.Running &&
+                    !busy &&
                         syncState !is CommaFeedReadSyncState.Running &&
                         baseUrl.isNotBlank() &&
                         username.isNotBlank() &&
-                        password.isNotBlank(),
+                        (password.isNotEmpty() || saved),
             ) {
                 Text(stringResource(R.string.commafeed_run_diagnostic))
             }
             Text(stringResource(R.string.commafeed_sync_description), style = MaterialTheme.typography.bodySmall)
             Button(
                 onClick = {
-                    onSync(baseUrl, username, password)
+                    onSync(baseUrl, username, password, savePassword)
                     password = ""
                 },
                 enabled =
-                    state !is CommaFeedDiagnosticState.Running &&
+                    !busy &&
                         syncState !is CommaFeedReadSyncState.Running &&
                         baseUrl.isNotBlank() &&
                         username.isNotBlank() &&
-                        password.isNotBlank(),
+                        (password.isNotEmpty() || saved),
             ) {
                 Text(stringResource(R.string.commafeed_sync_read))
             }
@@ -96,20 +113,13 @@ fun CommaFeedDiagnosticSection(
                 CommaFeedReadSyncState.Idle -> Unit
                 CommaFeedReadSyncState.Running -> Text(stringResource(R.string.commafeed_sync_running))
                 is CommaFeedReadSyncState.Failed -> {
-                    val error =
-                        when (current.error) {
-                            CommaFeedReadSyncError.INVALID_URL -> R.string.commafeed_invalid_url
-                            CommaFeedReadSyncError.AUTHENTICATION -> R.string.commafeed_authentication_failed
-                            CommaFeedReadSyncError.NETWORK -> R.string.commafeed_sync_network_error
-                            CommaFeedReadSyncError.FETCH_HTTP -> R.string.commafeed_sync_fetch_error
-                            CommaFeedReadSyncError.MALFORMED_RESPONSE -> R.string.commafeed_invalid_response
-                            CommaFeedReadSyncError.PROCESSING -> R.string.commafeed_sync_processing_error
-                        }
+                    val error = current.error.messageResource
                     Text(stringResource(error), color = MaterialTheme.colorScheme.error)
                 }
                 is CommaFeedReadSyncState.Success -> {
                     val result = current.result
                     Text(stringResource(R.string.commafeed_sync_complete))
+                    if (result.authenticationFailed) Text(stringResource(R.string.commafeed_authentication_failed), color = MaterialTheme.colorScheme.error)
                     Text(stringResource(R.string.commafeed_remote_fetched, result.remoteFetched))
                     Text(stringResource(R.string.commafeed_local_considered, result.localConsidered))
                     Text(stringResource(R.string.commafeed_matched, result.matched))

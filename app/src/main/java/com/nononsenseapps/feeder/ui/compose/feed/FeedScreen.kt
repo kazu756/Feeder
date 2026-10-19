@@ -180,6 +180,19 @@ fun FeedScreen(
     viewModel: FeedViewModel,
     navDrawerListState: LazyListState,
 ) {
+    val commaFeedBusy by viewModel.commaFeed.busy.collectAsStateWithLifecycle()
+    val commaFeedPrompt by viewModel.commaFeed.prompt.collectAsStateWithLifecycle()
+    val commaFeedResult by viewModel.commaFeed.syncState.collectAsStateWithLifecycle()
+    var commaFeedResultDismissed by remember { mutableStateOf(false) }
+    LaunchedEffect(commaFeedResult) { commaFeedResultDismissed = false }
+    CommaFeedManualSyncDialog(
+        prompt = commaFeedPrompt,
+        state = if (commaFeedResultDismissed) com.nononsenseapps.feeder.ui.compose.settings.CommaFeedReadSyncState.Idle else commaFeedResult,
+        busy = commaFeedBusy,
+        onSubmit = viewModel.commaFeed::submitPassword,
+        onDismissPrompt = viewModel.commaFeed::dismissPrompt,
+        onDismissResult = { commaFeedResultDismissed = true },
+    )
     val toastMaker: ToastMaker by instance()
     val viewState: FeedScreenViewState by viewModel.viewState.collectAsStateWithLifecycle()
     val canSummarize by viewModel.canSummarize.collectAsStateWithLifecycle()
@@ -294,6 +307,11 @@ fun FeedScreen(
     ) {
         FeedScreen(
             viewState = viewState,
+            commaFeedBusy = commaFeedBusy,
+            onCommaFeedSync = {
+                commaFeedResultDismissed = false
+                viewModel.commaFeed.requestSync()
+            },
             onRefreshVisible = {
                 viewModel.requestImmediateSyncOfCurrentFeedOrTag()
             },
@@ -576,6 +594,8 @@ fun FeedScreen(
     pagedFeedItems: LazyPagingItems<FeedListItem>,
     translatedFeedCards: TranslatedFeedCards,
     onTranslateFeedCard: (FeedListItem) -> Unit,
+    commaFeedBusy: Boolean = false,
+    onCommaFeedSync: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -845,6 +865,14 @@ fun FeedScreen(
                                     onShowToolbarMenu(false)
                                 },
                         ) {
+                            DropdownMenuItem(
+                                enabled = !commaFeedBusy,
+                                text = { Text(stringResource(if (commaFeedBusy) R.string.commafeed_sync_running else R.string.commafeed_manual_sync)) },
+                                onClick = {
+                                    onShowToolbarMenu(false)
+                                    onCommaFeedSync()
+                                },
+                            )
                             if (canSummarize) {
                                 DropdownMenuItem(
                                     onClick = {

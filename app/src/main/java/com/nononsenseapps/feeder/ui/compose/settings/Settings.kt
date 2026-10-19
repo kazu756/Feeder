@@ -137,8 +137,11 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val viewState by settingsViewModel.viewState.collectAsStateWithLifecycle()
-    val commaFeedState by settingsViewModel.commaFeedDiagnosticState.collectAsStateWithLifecycle()
-    val commaFeedSyncState by settingsViewModel.commaFeedReadSyncState.collectAsStateWithLifecycle()
+    val commaFeedState by settingsViewModel.commaFeed.diagnosticState.collectAsStateWithLifecycle()
+    val commaFeedSyncState by settingsViewModel.commaFeed.syncState.collectAsStateWithLifecycle()
+
+    val commaFeedSaved by settingsViewModel.commaFeed.saved.collectAsStateWithLifecycle()
+    val commaFeedBusy by settingsViewModel.commaFeed.busy.collectAsStateWithLifecycle()
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
@@ -268,12 +271,15 @@ fun SettingsScreen(
             modifier = Modifier.padding(padding),
             commaFeedSection = {
                 CommaFeedDiagnosticSection(
-                    initialBaseUrl = settingsViewModel.commaFeedBaseUrl,
-                    initialUsername = settingsViewModel.commaFeedUsername,
+                    initialBaseUrl = settingsViewModel.commaFeed.baseUrl,
+                    initialUsername = settingsViewModel.commaFeed.username,
                     state = commaFeedState,
                     syncState = commaFeedSyncState,
-                    onRun = settingsViewModel::runCommaFeedDiagnostic,
-                    onSync = settingsViewModel::runCommaFeedReadSync,
+                    saved = commaFeedSaved,
+                    busy = commaFeedBusy,
+                    onClearPassword = settingsViewModel.commaFeed::clearPassword,
+                    onRun = settingsViewModel.commaFeed::runDiagnostic,
+                    onSync = settingsViewModel.commaFeed::runSync,
                 )
             },
         )

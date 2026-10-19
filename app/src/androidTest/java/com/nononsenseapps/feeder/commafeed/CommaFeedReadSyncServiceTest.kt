@@ -81,6 +81,24 @@ class CommaFeedReadSyncServiceTest {
     }
 
     @Test
+    fun writeAuthenticationFailureIsReportedWithoutChangingReadWins() {
+        runBlocking {
+            val localId = insertLocal(read = true)
+            server.enqueue(MockResponse().setBody(page(read = false)))
+            server.enqueue(MockResponse().setResponseCode(403))
+            val result = service().run("http://10.0.2.2:8082", "user", "test-password")
+            assertTrue(result.authenticationFailed)
+            assertEquals(1, result.remoteFailedWrites)
+            assertNotNull(
+                testDb.db
+                    .feedItemDao()
+                    .loadFeedItem(localId)
+                    ?.readTime,
+            )
+        }
+    }
+
+    @Test
     fun remoteReadMarksOnlyLocalAndNeverPosts() {
         runBlocking {
             val localId = insertLocal(read = false)

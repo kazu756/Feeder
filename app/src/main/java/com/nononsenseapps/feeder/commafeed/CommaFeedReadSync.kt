@@ -38,6 +38,7 @@ data class ReadSyncResult(
     val localFailedWrites: Int,
     val remoteFailedWrites: Int,
     val remoteVerificationFailed: Boolean,
+    val authenticationFailed: Boolean = false,
 )
 
 class CommaFeedReadSyncService(
@@ -62,13 +63,15 @@ class CommaFeedReadSyncService(
 
             var postedRemoteIds = emptySet<String>()
             var remoteFailed = plan.unmarkableRemote
+            var authenticationFailed = false
             for (ids in plan.remoteIds.chunked(100)) {
                 try {
                     client.markRead(normalizedBaseUrl, username, password, ids)
                     postedRemoteIds = postedRemoteIds + ids
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    if (e is CommaFeedFailure.Authentication) authenticationFailed = true
                     remoteFailed += ids.size
                 }
             }
@@ -87,7 +90,8 @@ class CommaFeedReadSyncService(
                     remoteFailed += postedRemoteIds.size - confirmed.size
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    if (e is CommaFeedFailure.Authentication) authenticationFailed = true
                     verificationFailed = true
                 }
             }
@@ -119,6 +123,7 @@ class CommaFeedReadSyncService(
                 localFailedWrites = localFailed,
                 remoteFailedWrites = remoteFailed,
                 remoteVerificationFailed = verificationFailed,
+                authenticationFailed = authenticationFailed,
             )
         }
 }
