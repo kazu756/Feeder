@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.kodein.di.DI
 import org.kodein.di.DIAware
@@ -45,6 +46,15 @@ class CommaFeedManualSync(
 
     fun dismissPrompt() {
         mutablePrompt.value = false
+    }
+
+    /** Consume the displayed result in its shared owner, including across screen recreation. */
+    fun consumeResult(result: CommaFeedReadSyncState) {
+        if (result is CommaFeedReadSyncState.Success || result is CommaFeedReadSyncState.Failed) {
+            mutableSync.update { current ->
+                if (current === result) CommaFeedReadSyncState.Idle else current
+            }
+        }
     }
 
     fun clearPassword() {

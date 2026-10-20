@@ -1,12 +1,25 @@
 package com.nononsenseapps.feeder.commafeed
 
 import android.app.Application
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.nononsenseapps.feeder.ApplicationCoroutineScope
+import com.nononsenseapps.feeder.R
 import com.nononsenseapps.feeder.archmodel.FeedItemStore
 import com.nononsenseapps.feeder.db.room.FeedItemDao
 import com.nononsenseapps.feeder.ui.TestDatabaseRule
+import com.nononsenseapps.feeder.ui.compose.feed.CommaFeedManualSyncDialog
 import com.nononsenseapps.feeder.ui.compose.settings.CommaFeedReadSyncError
 import com.nononsenseapps.feeder.ui.compose.settings.CommaFeedReadSyncState
 import kotlinx.coroutines.cancel
@@ -38,6 +51,9 @@ class CommaFeedManualSyncTest {
 
     @get:Rule
     val testDb = TestDatabaseRule(app)
+
+    @get:Rule
+    val compose = createComposeRule()
     private val testScope = ApplicationCoroutineScope()
     private val server = MockWebServer()
     private val credentials = CommaFeedCredentialStore(app, "feeder_commafeed_manual_test", "commafeed_manual_test")
@@ -73,6 +89,71 @@ class CommaFeedManualSyncTest {
         credentials.clearPassword()
         prefs.edit().clear().commit()
         server.shutdown()
+    }
+
+    @Test
+    fun successIsConsumedAcrossScreenRecreationAndNextSyncStillShowsResult() {
+        verifyResultConsumption(failure = false)
+    }
+
+    @Test
+    fun failureIsConsumedOnDismissAcrossScreenRecreation() {
+        verifyResultConsumption(failure = true)
+    }
+
+    private fun verifyResultConsumption(failure: Boolean) {
+        val folder = mutableStateOf("first")
+        val visible = mutableStateOf(true)
+        val recompose = mutableIntStateOf(0)
+        compose.setContent {
+            MaterialTheme {
+                // A folder destination gets a fresh composition, sharing the same sync owner.
+                if (visible.value) {
+                    key(folder.value) {
+                        val state by manual.syncState.collectAsState()
+                        val busy by manual.busy.collectAsState()
+                        androidx.compose.material3.Text("${folder.value}:${recompose.value}")
+                        CommaFeedManualSyncDialog(
+                            prompt = false,
+                            state = state,
+                            busy = busy,
+                            onSubmit = { _, _ -> },
+                            onDismissPrompt = {},
+                            onDismissResult = { manual.consumeResult(state) },
+                        )
+                    }
+                }
+            }
+        }
+        val message = app.getString(if (failure) R.string.commafeed_sync_fetch_error else R.string.commafeed_manual_unchanged)
+        var previous: CommaFeedReadSyncState? = null
+        repeat(2) { attempt ->
+            if (failure) server.enqueue(MockResponse().setResponseCode(500)) else enqueueEmpty()
+            manual.submitPassword("once-only", false)
+            awaitIdle()
+            val result = manual.syncState.value
+            if (failure) assertIs<CommaFeedReadSyncState.Failed>(result) else assertIs<CommaFeedReadSyncState.Success>(result)
+            previous?.let { old ->
+                // Even equal-valued results from separate runs must not consume each other.
+                manual.consumeResult(old)
+                assertTrue(manual.syncState.value === result)
+            }
+            compose.onNodeWithText(message).assertIsDisplayed()
+            if (failure) pressBack() else compose.onNodeWithText(app.getString(android.R.string.ok)).performClick()
+            compose.waitForIdle()
+            assertIs<CommaFeedReadSyncState.Idle>(manual.syncState.value)
+            compose.onNodeWithText(message).assertDoesNotExist()
+            compose.runOnIdle { recompose.value++ }
+            compose.onNodeWithText(message).assertDoesNotExist()
+            compose.runOnIdle { folder.value = "folder-$attempt" }
+            compose.onNodeWithText(message).assertDoesNotExist()
+            compose.runOnIdle { visible.value = false }
+            compose.waitForIdle()
+            compose.runOnIdle { visible.value = true }
+            compose.onNodeWithText(message).assertDoesNotExist()
+            assertEquals(attempt + 1, server.requestCount)
+            previous = result
+        }
     }
 
     @Test

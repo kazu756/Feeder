@@ -183,15 +183,13 @@ fun FeedScreen(
     val commaFeedBusy by viewModel.commaFeed.busy.collectAsStateWithLifecycle()
     val commaFeedPrompt by viewModel.commaFeed.prompt.collectAsStateWithLifecycle()
     val commaFeedResult by viewModel.commaFeed.syncState.collectAsStateWithLifecycle()
-    var commaFeedResultDismissed by remember { mutableStateOf(false) }
-    LaunchedEffect(commaFeedResult) { commaFeedResultDismissed = false }
     CommaFeedManualSyncDialog(
         prompt = commaFeedPrompt,
-        state = if (commaFeedResultDismissed) com.nononsenseapps.feeder.ui.compose.settings.CommaFeedReadSyncState.Idle else commaFeedResult,
+        state = commaFeedResult,
         busy = commaFeedBusy,
         onSubmit = viewModel.commaFeed::submitPassword,
         onDismissPrompt = viewModel.commaFeed::dismissPrompt,
-        onDismissResult = { commaFeedResultDismissed = true },
+        onDismissResult = { viewModel.commaFeed.consumeResult(commaFeedResult) },
     )
     val toastMaker: ToastMaker by instance()
     val viewState: FeedScreenViewState by viewModel.viewState.collectAsStateWithLifecycle()
@@ -308,10 +306,7 @@ fun FeedScreen(
         FeedScreen(
             viewState = viewState,
             commaFeedBusy = commaFeedBusy,
-            onCommaFeedSync = {
-                commaFeedResultDismissed = false
-                viewModel.commaFeed.requestSync()
-            },
+            onCommaFeedSync = viewModel.commaFeed::requestSync,
             onRefreshVisible = {
                 viewModel.requestImmediateSyncOfCurrentFeedOrTag()
             },
