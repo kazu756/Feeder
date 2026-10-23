@@ -451,8 +451,8 @@
   <string name="miniflux_redirect_error">Redirect refused. Enter the final server root URL.</string>
   <string name="miniflux_json_error">Invalid JSON or unexpected API response.</string>
   <string name="miniflux_response_large">Diagnostic response exceeded the size limit.</string>
-  <string name="miniflux_cache_scope">Separate read-only cache: all unread and starred entries, plus up to 1000 read entries from the last 30 days. Local RSS is unchanged.</string>
-  <string name="miniflux_cache_sync">Sync Miniflux cache (read-only)</string>
+  <string name="miniflux_cache_scope">Initial cache: unread, starred and up to 1000 recent read entries. Later syncs fetch changed entries. Read-state sending is separate. Local RSS is unchanged.</string>
+  <string name="miniflux_cache_sync">Sync Miniflux cache (initial / incremental, GET only)</string>
   <string name="miniflux_cache_failed">Cache sync did not complete (%1$s, page %2$d). Existing cache is retained; retry manual sync.</string>
   <string name="miniflux_cache_complete">Cache sync completed. Miniflux read/star status has not been changed.</string>
   <string name="miniflux_cache_counts">Feeds: %1$d · Categories: %2$d · Entries: %3$d · Content blobs: %4$d</string>
@@ -472,4 +472,8 @@
     <string name="miniflux_read_complete">Read-state sync attempt finished.</string>
     <string name="miniflux_read_result">Requested: %1$d · Confirmed: %2$d · Pending: %3$d · Failed: %4$d</string>
     <string name="miniflux_read_error">Sync stopped: %1$s. Unconfirmed changes remain pending.</string>
+    <string name="miniflux_cache_initial">Initial</string>
+    <string name="miniflux_cache_bootstrap">Checkpoint initialization</string>
+    <string name="miniflux_cache_incremental">Incremental</string>
+    <string name="miniflux_cache_delta_result">%1$s: fetched %2$d · inserted %3$d · updated %4$d · unchanged %5$d · deduplicated %6$d · pending protected %7$d · blobs updated %8$d · pages %9$d</string>
 </resources>

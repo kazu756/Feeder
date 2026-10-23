@@ -190,7 +190,7 @@ class MinifluxCacheStoreTest {
             db.openHelper.readableDatabase
                 .query("PRAGMA foreign_key_check")
                 .use { assertEquals(0, it.count) }
-            assertEquals(2, db.openHelper.readableDatabase.version)
+            assertEquals(3, db.openHelper.readableDatabase.version)
             store.close()
             assertEquals(entry.content, store.readBody(profile.id, identity.localFeedItemId))
         }
@@ -212,7 +212,7 @@ class MinifluxCacheStoreTest {
                                 "/v1/categories" -> """[{"id":99,"title":"News"}]"""
                                 "/v1/entries" -> {
                                     if (fail) return okhttp3.mockwebserver.MockResponse().setResponseCode(503)
-                                    assertEquals("100", request.requestUrl!!.queryParameter("limit"))
+                                    assertEquals(if (request.requestUrl!!.queryParameter("order") == "changed_at") "1" else "100", request.requestUrl!!.queryParameter("limit"))
                                     if (request.requestUrl!!.queryParameter("before_entry_id") != null || request.requestUrl!!.queryParameter("status") == "read") {
                                         """{"total":0,"entries":[]}"""
                                     } else {
@@ -224,6 +224,7 @@ class MinifluxCacheStoreTest {
 "status":"unread",
 "starred":true,
 "published_at":"2026-10-23T00:00:00Z",
+"changed_at":"2026-10-23T00:00:01Z",
 "url":"https://example.com/a",
 "content":"<p>Cached body</p>"}]}
 """

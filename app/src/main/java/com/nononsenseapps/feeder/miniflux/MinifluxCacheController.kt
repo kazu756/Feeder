@@ -25,6 +25,7 @@ data class MinifluxCacheState(
     val readStates: Boolean = false,
     val readResult: MinifluxReadSyncResult? = null,
     val errorType: String? = null,
+    val cacheResult: MinifluxCacheSyncResult? = null,
 )
 
 class MinifluxCacheController(
@@ -62,12 +63,14 @@ class MinifluxCacheController(
         readStates: Boolean = false,
     ) {
         if (!active.compareAndSet(false, true)) return
-        mutableState.update { it.copy(busy = true, failed = false, completed = false, remaining = null, readResult = null, errorType = null, readStates = readStates, stage = "account", count = 0) }
+        mutableState.update {
+            it.copy(busy = true, failed = false, completed = false, remaining = null, readResult = null, cacheResult = null, errorType = null, readStates = readStates, stage = "account", count = 0)
+        }
         job =
             scope
                 .launch(Dispatchers.IO) {
                     try {
-                        withTimeout(if (readStates) manualTimeoutMillis else Long.MAX_VALUE) {
+                        withTimeout(if (readStates) manualTimeoutMillis else MINIFLUX_CACHE_TIMEOUT_MS + 5000) {
                             val base = normalizedMinifluxUrl(baseUrl).toString()
                             val token = credentials.loadToken(base) ?: throw MinifluxFailure(MinifluxError.MISSING_TOKEN)
                             if (readStates) {
@@ -78,7 +81,7 @@ class MinifluxCacheController(
                                 mutableState.update { it.copy(remaining = result.pending, readResult = result, completed = true) }
                             } else {
                                 val summary = sync.sync(base, token) { stage, count -> mutableState.update { it.copy(stage = stage, count = count) } }
-                                mutableState.update { it.copy(summary = summary, completed = true) }
+                                mutableState.update { it.copy(summary = summary, cacheResult = summary.syncResult, completed = true) }
                             }
                         }
                     } catch (e: TimeoutCancellationException) {
@@ -92,9 +95,13 @@ class MinifluxCacheController(
                         if (!readStates) {
                             // Partial cache remains available; it is never marked complete on failure/cancel.
                             try {
-                                store.selectedProfile()?.let { profile ->
-                                    mutableState.update { it.copy(summary = store.summary(profile)) }
+                                withTimeout(2000) {
+                                    store.selectedProfile()?.let { profile ->
+                                        mutableState.update { it.copy(summary = store.summary(profile)) }
+                                    }
                                 }
+                            } catch (_: TimeoutCancellationException) {
+                                currentCoroutineContext().ensureActive()
                             } catch (e: CancellationException) {
                                 throw e
                             } catch (_: Exception) {

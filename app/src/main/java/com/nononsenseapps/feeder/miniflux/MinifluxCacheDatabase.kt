@@ -30,6 +30,7 @@ data class MinifluxProfile(
     val createdAt: Long,
     val lastSuccessfulSync: Long? = null,
     val changedCheckpoint: String? = null,
+    @ColumnInfo(defaultValue = "NULL") val bootstrapChangedAt: String? = null,
 )
 
 @Entity(
@@ -105,6 +106,24 @@ data class MinifluxReadOutbox(
 
 @Dao
 interface MinifluxCacheDao {
+    @Query("SELECT changedAt FROM miniflux_entry_identity")
+    suspend fun cachedChangeTimes(): List<MinifluxCachedChangeTime>
+
+    @Query(
+        "UPDATE miniflux_profiles SET changedCheckpoint=:checkpoint, bootstrapChangedAt=CASE WHEN :checkpoint IS NULL THEN bootstrapChangedAt ELSE NULL END, lastSuccessfulSync=:completedAt WHERE id=:profile",
+    )
+    suspend fun completeSync(
+        profile: String,
+        checkpoint: String?,
+        completedAt: Long,
+    )
+
+    @Query("UPDATE miniflux_profiles SET bootstrapChangedAt=:lower WHERE id=:profile AND changedCheckpoint IS NULL AND bootstrapChangedAt IS NULL")
+    suspend fun freezeBootstrap(
+        profile: String,
+        lower: String,
+    )
+
     @Query("SELECT * FROM miniflux_read_outbox WHERE profileId=:profile AND remoteEntryId=:remote")
     suspend fun pending(
         profile: String,
@@ -204,16 +223,27 @@ interface MinifluxCacheDao {
     )
 }
 
+data class MinifluxCachedChangeTime(
+    val changedAt: String?,
+)
+
 /** Entirely separate from AppDatabase and its singleton/DAOs. One physical database per profile. */
 @Database(
     entities = [Feed::class, FeedItem::class, MinifluxProfile::class, MinifluxCachedCategory::class, MinifluxFeedIdentity::class, MinifluxEntryIdentity::class, MinifluxReadOutbox::class],
-    version = 2,
+    version = 3,
 )
 @TypeConverters(Converters::class)
 abstract class MinifluxCacheDatabase : RoomDatabase() {
     abstract fun cacheDao(): MinifluxCacheDao
 
     companion object {
+        val MIGRATION_2_3 =
+            object : Migration(2, 3) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE miniflux_profiles ADD COLUMN bootstrapChangedAt TEXT DEFAULT NULL")
+                }
+            }
+
         val MIGRATION_1_2 =
             object : Migration(1, 2) {
                 override fun migrate(db: SupportSQLiteDatabase) {

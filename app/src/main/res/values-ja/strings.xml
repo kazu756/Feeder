@@ -296,8 +296,8 @@
   <string name="miniflux_redirect_error">redirectを拒否しました。転送先のサーバールートURLを入力してください。</string>
   <string name="miniflux_json_error">JSONまたはAPI応答形式が不正です。</string>
   <string name="miniflux_response_large">診断応答がサイズ上限を超えました。</string>
-  <string name="miniflux_cache_scope">独立した読み取り専用キャッシュ：未読全件・starred全件・直近30日の既読（最大1000件）。通常RSSは従来どおりです。</string>
-  <string name="miniflux_cache_sync">Minifluxキャッシュを同期（読み取り専用）</string>
+  <string name="miniflux_cache_scope">初回は未読・starred・直近30日の既読（最大1000件）を取得し、以降は変更記事を取得します。既読状態の送信は別操作です。通常RSSは従来どおりです。</string>
+  <string name="miniflux_cache_sync">Minifluxキャッシュを同期（初回／差分・GETのみ）</string>
   <string name="miniflux_cache_failed">キャッシュ同期は未完了です（%1$s・page %2$d）。既存キャッシュは保持しています。手動で再試行してください。</string>
   <string name="miniflux_cache_complete">キャッシュ同期が完了しました。Minifluxの既読・star状態は変更していません。</string>
   <string name="miniflux_cache_counts">Feed：%1$d · Category：%2$d · 記事：%3$d · 本文blob：%4$d</string>
@@ -317,4 +317,8 @@
     <string name="miniflux_read_complete">既読状態の同期処理が終了しました。</string>
     <string name="miniflux_read_result">対象: %1$d件・確認: %2$d件・保留: %3$d件・失敗: %4$d件</string>
     <string name="miniflux_read_error">同期を終了しました: %1$s。未確認の変更は保留しています。</string>
+    <string name="miniflux_cache_initial">初回</string>
+    <string name="miniflux_cache_bootstrap">差分位置の初期化</string>
+    <string name="miniflux_cache_incremental">差分</string>
+    <string name="miniflux_cache_delta_result">%1$s: 取得%2$d・追加%3$d・更新%4$d・変更なし%5$d・重複除外%6$d・保留保護%7$d・本文更新%8$d・ページ%9$d</string>
 </resources>

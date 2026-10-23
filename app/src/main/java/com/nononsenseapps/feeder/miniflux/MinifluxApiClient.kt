@@ -125,10 +125,22 @@ class MinifluxApiClient internal constructor(
         publishedAfter: Long? = null,
         beforeId: Long? = null,
         limit: Int = 100,
+        changedAfter: Long? = null,
+        changedBefore: Long? = null,
+        order: String = "id",
     ): MinifluxEntries {
         require(limit in 1..100)
         require(status == null || status in setOf("read", "unread"))
-        val query = mutableMapOf("limit" to limit.toString(), "order" to "id", "direction" to "desc")
+        require(order in setOf("id", "changed_at"))
+        val query = mutableMapOf("limit" to limit.toString(), "order" to order, "direction" to "desc")
+        changedAfter?.let {
+            require(it > 0)
+            query["changed_after"] = it.toString()
+        }
+        changedBefore?.let {
+            require(it > 0)
+            query["changed_before"] = it.toString()
+        }
         status?.let { query["status"] = it }
         starred?.let { query["starred"] = it.toString() }
         publishedAfter?.let { query["published_after"] = it.toString() }

@@ -39,6 +39,30 @@ fun MinifluxCacheSection(
             Text(stringResource(R.string.miniflux_read_result, result.requested, result.confirmed, result.pending, result.failed))
         }
         state.errorType?.let { Text(stringResource(R.string.miniflux_read_error, it)) }
+        state.cacheResult?.let { result ->
+            val mode =
+                stringResource(
+                    when (result.mode) {
+                        "initial" -> R.string.miniflux_cache_initial
+                        "bootstrap" -> R.string.miniflux_cache_bootstrap
+                        else -> R.string.miniflux_cache_incremental
+                    },
+                )
+            Text(
+                stringResource(
+                    R.string.miniflux_cache_delta_result,
+                    mode,
+                    result.fetched,
+                    result.inserted,
+                    result.updated,
+                    result.unchanged,
+                    result.deduplicated,
+                    result.pendingProtected,
+                    result.blobsUpdated,
+                    result.pages,
+                ),
+            )
+        }
         if (state.busy) {
             LinearProgressIndicator()
             Text("${state.stage}: ${state.count}")

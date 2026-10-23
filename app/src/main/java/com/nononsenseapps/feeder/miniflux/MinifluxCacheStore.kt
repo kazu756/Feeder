@@ -36,6 +36,14 @@ data class MinifluxCacheSummary(
     val categories: Int,
     val entries: Int,
     val blobs: Int,
+    val syncResult: MinifluxCacheSyncResult? = null,
+)
+
+data class MinifluxCacheWriteResult(
+    val inserted: Boolean,
+    val updated: Boolean,
+    val pendingProtected: Boolean,
+    val blobUpdated: Boolean,
 )
 
 data class MinifluxCachedArticle(
@@ -61,7 +69,7 @@ class MinifluxCacheStore(
         return databases.getOrPut(profileId) {
             Room
                 .databaseBuilder(context, MinifluxCacheDatabase::class.java, "miniflux_cache_$profileId.db")
-                .addMigrations(MinifluxCacheDatabase.MIGRATION_1_2)
+                .addMigrations(MinifluxCacheDatabase.MIGRATION_1_2, MinifluxCacheDatabase.MIGRATION_2_3)
                 .build()
         }
     }
@@ -127,6 +135,24 @@ class MinifluxCacheStore(
         val content = entry.content ?: error("Missing content")
         val db = database(profile.id)
         val dao = db.cacheDao()
+        val prior = dao.entryIdentity(profile.id, entry.id)
+        val priorItem = prior?.let { dao.item(it.localFeedItemId) }
+        val hash = cacheHash(content)
+        val writeBody =
+            if (prior?.contentHash == hash && prior.blobReady) {
+                try {
+                    readBody(profile.id, prior.localFeedItemId)
+                    false
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    true
+                }
+            } else {
+                true
+            }
+        var pendingProtected = false
+        var metadataChanged = false
         val mapped =
             db.withTransaction {
                 val feedIdentity = dao.feedIdentity(profile.id, entry.feedId) ?: error("Unknown feed")
@@ -146,7 +172,10 @@ class MinifluxCacheStore(
                     ParsedFeed(title = null, items = null),
                 )
                 item.feedId = feedIdentity.localFeedId
-                val effective = dao.pending(profile.id, entry.id)?.desiredStatus ?: entry.status
+                metadataChanged = priorItem != null && (priorItem.plainTitle != item.plainTitle || priorItem.link != item.link || priorItem.author != item.author || priorItem.pubDate != item.pubDate)
+                val pending = dao.pending(profile.id, entry.id)
+                pendingProtected = pending != null
+                val effective = pending?.desiredStatus ?: entry.status
                 item.readTime = if (effective == "read") item.readTime ?: Instant.EPOCH else null
                 item.bookmarked = entry.starred
                 item.notified = true
@@ -160,15 +189,27 @@ class MinifluxCacheStore(
                     entry.status,
                     entry.starred,
                     entry.createdAt,
-                    cacheHash(content),
-                    blobReady = false,
+                    hash,
+                    blobReady = !writeBody,
                     readGeneration = old?.readGeneration ?: 0,
                 ).also { dao.saveEntryIdentity(it) }
             }
         coroutineContext.ensureActive()
-        writeBlob(profile.id, mapped.localFeedItemId, content)
+        if (writeBody) writeBlob(profile.id, mapped.localFeedItemId, content)
         coroutineContext.ensureActive()
         dao.markBlobReady(profile.id, entry.id, mapped.contentHash)
+        val updated =
+            prior != null &&
+                (
+                    prior.changedAt != entry.changedAt ||
+                        prior.contentHash != hash ||
+                        prior.remoteStatus != entry.status ||
+                        prior.remoteStarred != entry.starred ||
+                        prior.remoteFeedId != entry.feedId ||
+                        prior.remoteCreatedAt != entry.createdAt ||
+                        metadataChanged
+                )
+        MinifluxCacheWriteResult(prior == null, updated, pendingProtected, writeBody)
     }
 
     private fun writeBlob(
@@ -196,9 +237,15 @@ class MinifluxCacheStore(
         }
     }
 
-    suspend fun complete(profile: MinifluxProfile) {
+    suspend fun complete(
+        profile: MinifluxProfile,
+        checkpoint: String? = profile.changedCheckpoint,
+    ): MinifluxProfile {
         val dao = database(profile.id).cacheDao()
-        dao.saveProfile(profile.copy(lastSuccessfulSync = System.currentTimeMillis()))
+        val current = dao.profile() ?: profile
+        val completed = current.copy(lastSuccessfulSync = System.currentTimeMillis(), changedCheckpoint = checkpoint, bootstrapChangedAt = if (checkpoint == null) current.bootstrapChangedAt else null)
+        dao.completeSync(profile.id, checkpoint, completed.lastSuccessfulSync!!)
+        return completed
     }
 
     suspend fun selectedProfile(): MinifluxProfile? =

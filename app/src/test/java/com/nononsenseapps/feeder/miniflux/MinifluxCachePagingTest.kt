@@ -47,4 +47,33 @@ class MinifluxCachePagingTest {
                 collectCachePages(MinifluxCacheScope.UNREAD, now, { _, _ -> throw CancellationException() }, {}, {})
             }
         }
+
+    @Test fun deltaPagesKeepEqualTimestampsAcrossIdCursors() =
+        runBlocking<Unit> {
+            val ids = mutableListOf<Long>()
+            collectChangedPages(now.minusSeconds(2).epochSecond, now.plusSeconds(1).epochSecond, fetch = { cursor ->
+                MinifluxEntries(250, (250L downTo 1L).filter { cursor == null || it < cursor }.take(100).map { entry(it).copy(changedAt = now.toString()) })
+            }, consume = { ids += it.id })
+            assertEquals((250L downTo 1L).toList(), ids)
+        }
+
+    @Test fun deltaRejectsIgnoredBoundsMissingTimestampsAndIgnoredCursor() =
+        runBlocking<Unit> {
+            val after = now.minusSeconds(2).epochSecond
+            val before = now.plusSeconds(1).epochSecond
+            for (value in listOf(now.minusSeconds(2).toString(), now.plusSeconds(1).toString())) {
+                assertFailsWith<IllegalArgumentException> {
+                    collectChangedPages(after, before, { MinifluxEntries(1, listOf(entry(1).copy(changedAt = value))) }, {})
+                }
+            }
+            assertFailsWith<IllegalStateException> {
+                collectChangedPages(after, before, { MinifluxEntries(1, listOf(entry(1))) }, {})
+            }
+            assertFailsWith<IllegalArgumentException> {
+                collectChangedPages(after, before, { MinifluxEntries(1, listOf(entry(1).copy(changedAt = now.toString()))) }, {})
+            }
+            assertFailsWith<CancellationException> {
+                collectChangedPages(after, before, { throw CancellationException() }, {})
+            }
+        }
 }

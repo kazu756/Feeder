@@ -13,6 +13,7 @@ import com.nononsenseapps.feeder.R
 import com.nononsenseapps.feeder.blob.blobFile
 import com.nononsenseapps.feeder.ui.compose.utils.WithAllPreviewProviders
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Rule
@@ -145,5 +146,31 @@ class MinifluxCacheReaderTest {
         compose.onNodeWithTag("readerColumn").assertExists()
         runBlocking { assertEquals("unread", store.articles(profile.id, 0).single().effectiveStatus) }
         assertEquals(3, server.requestCount)
+    }
+
+    @Test fun incrementalContentUpdateIsRenderedThroughExistingReader() {
+        val profile = prepare()
+        val checkpoint = "2026-10-22T00:00:00Z"
+        runBlocking { store.database(profile.id).cacheDao().saveProfile(profile.copy(changedCheckpoint = checkpoint, lastSuccessfulSync = 123)) }
+        val updated =
+            MinifluxEntry(9000, 5000, "Cached title", "unread", true, "2026-10-23T00:00:00Z", "2026-10-23T00:00:01Z", server.url("/article").toString(), content = "<p>Incremental Reader body</p>")
+        val page =
+            kotlinx.serialization.json.Json
+                .encodeToString(MinifluxEntries(1, listOf(updated)))
+
+        fun enqueue(body: String) = server.enqueue(okhttp3.mockwebserver.MockResponse().setBody(body))
+        enqueue("""{"id":42,"username":"test"}""")
+        enqueue(page)
+        enqueue("""[{"id":99,"title":"News"}]""")
+        enqueue("""[{"id":5000,"title":"Feed","feed_url":"${server.url("/rss")}","category":{"id":99,"title":"News"}}]""")
+        enqueue(page)
+        enqueue("""{"total":0,"entries":[]}""")
+        runBlocking { MinifluxCacheSync(MinifluxApiClient(), store).sync(profile.baseUrl, "fixture-token") { _, _ -> } }
+        compose.setContent { WithAllPreviewProviders { MinifluxCachePreview(store, profile, {}) } }
+        compose.waitUntil(10000) { compose.onAllNodesWithText("Cached title").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Cached title").performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("Incremental Reader body", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("readerColumn").assertExists()
+        assertEquals(6, server.requestCount)
     }
 }
