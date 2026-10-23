@@ -44,7 +44,6 @@ class SettingsViewModel(
     private val applicationCoroutineScope: ApplicationCoroutineScope by instance()
     private val openAIApi: OpenAIApi by instance()
     private val bergamotModelManager: BergamotModelManager by instance()
-    val commaFeed: com.nononsenseapps.feeder.commafeed.CommaFeedManualSync by instance()
 
     fun setCurrentTheme(value: ThemeOptions) {
         repository.setCurrentTheme(value)

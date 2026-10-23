@@ -21,9 +21,6 @@ import java.time.Instant
 
 @Dao
 interface FeedDao {
-    @Query("SELECT COUNT(*) FROM feeds WHERE url IN (:feedUrls)")
-    suspend fun countForCommaFeedDiagnostic(feedUrls: List<String>): Int
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFeed(feed: Feed): Long
 

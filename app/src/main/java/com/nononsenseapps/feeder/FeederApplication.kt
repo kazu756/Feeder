@@ -22,7 +22,6 @@ import com.danielrampelt.coil.ico.IcoDecoder
 import com.nononsenseapps.feeder.archmodel.Repository
 import com.nononsenseapps.feeder.db.room.AppDatabase
 import com.nononsenseapps.feeder.db.room.BlocklistDao
-import com.nononsenseapps.feeder.db.room.CommaFeedArticleMappingDao
 import com.nononsenseapps.feeder.db.room.FeedDao
 import com.nononsenseapps.feeder.db.room.FeedItemDao
 import com.nononsenseapps.feeder.db.room.ReadStatusSyncedDao
@@ -82,7 +81,6 @@ class FeederApplication :
         bind<AppDatabase>() with singleton { AppDatabase.getInstance(this@FeederApplication) }
         bind<FeedDao>() with singleton { instance<AppDatabase>().feedDao() }
         bind<FeedItemDao>() with singleton { instance<AppDatabase>().feedItemDao() }
-        bind<CommaFeedArticleMappingDao>() with singleton { instance<AppDatabase>().commaFeedArticleMappingDao() }
         bind<SyncRemoteDao>() with singleton { instance<AppDatabase>().syncRemoteDao() }
         bind<ReadStatusSyncedDao>() with singleton { instance<AppDatabase>().readStatusSyncedDao() }
         bind<RemoteReadMarkDao>() with singleton { instance<AppDatabase>().remoteReadMarkDao() }

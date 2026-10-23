@@ -1,59 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="commafeed_experimental">CommaFeed (Experimental)</string>
-  <string name="commafeed_read_only_description">Read-only article matching diagnostic. This does not change read status. Local scope: up to 1000 newest local articles in feeds with exactly matching URLs. HTTP sends your password without TLS; use only a trusted LAN.</string>
-  <string name="commafeed_base_url">Base URL</string>
-  <string name="commafeed_username">Username</string>
-  <string name="commafeed_credential">Password</string>
-  <string name="commafeed_credential_note">Saving is optional. Saved passwords are encrypted on this device. HTTP does not encrypt network traffic.</string>
-  <string name="commafeed_run_diagnostic">Check article matching (read-only)</string>
-  <string name="commafeed_running">Connecting and comparing…</string>
-  <string name="commafeed_connection_success">Connection: Success</string>
-  <string name="commafeed_connection_failed">Connection: Failed</string>
-  <string name="commafeed_read">read</string>
-  <string name="commafeed_unread">unread</string>
-  <string name="commafeed_scope">Remote scope: first up to 1000 entries returned by CommaFeed (order=desc), in 500-entry pages.</string>
-  <string name="commafeed_remote_fetched">Remote entries fetched: %1$d</string>
-  <string name="commafeed_local_considered">Local articles considered: %1$d</string>
-  <string name="commafeed_matched">Matched total: %1$d</string>
-  <string name="commafeed_guid">Matched by GUID: %1$d</string>
-  <string name="commafeed_url">Matched by exact article URL: %1$d</string>
-  <string name="commafeed_ambiguous">Ambiguous: local %1$d, remote %2$d</string>
-  <string name="commafeed_local_only">Local only / unmatched: %1$d</string>
-  <string name="commafeed_remote_only">Remote only / unmatched: %1$d</string>
-  <string name="commafeed_read_same">Read state same: %1$d</string>
-  <string name="commafeed_read_different">Read state different: %1$d</string>
-  <string name="commafeed_local_rate">Local match rate (matched / local considered): %1$s%%</string>
-  <string name="commafeed_remote_rate">Remote match rate (matched / remote fetched): %1$s%%</string>
-  <string name="commafeed_no_matching_feeds">No matching feeds in this diagnostic scope.</string>
-  <string name="commafeed_no_matching_articles">No matching articles in this diagnostic scope.</string>
-  <string name="commafeed_connection_refused">Connection refused. Check the server address and Docker port.</string>
-  <string name="commafeed_timeout">Connection timed out.</string>
-  <string name="commafeed_authentication_failed">Authentication failed. Enter the password again; any saved password has been removed.</string>
-  <string name="commafeed_http_error">CommaFeed returned an HTTP error.</string>
-  <string name="commafeed_invalid_response">CommaFeed returned an invalid response.</string>
-  <string name="commafeed_pagination_error">CommaFeed pagination response was inconsistent.</string>
-  <string name="commafeed_invalid_url">Invalid base URL. Enter the server origin only.</string>
-  <string name="commafeed_partial_failure">Diagnostic failed after connecting. No read state was changed.</string>
-  <string name="commafeed_local_only_reason">Local only</string>
-  <string name="commafeed_remote_only_reason">Remote only</string>
-  <string name="commafeed_ambiguous_reason">Ambiguous</string>
-  <string name="commafeed_read_mismatch_reason">Read mismatch</string>
-  <string name="commafeed_detail">%1$s · %2$s — %3$s (local read: %4$s, remote read: %5$s)</string>
-  <string name="commafeed_sync_description">Manual read-only-direction sync for safely matched articles. Either side being read marks the other as read. Unmatched and ambiguous articles are skipped.</string>
-  <string name="commafeed_sync_read">Sync read state with CommaFeed</string>
-  <string name="commafeed_sync_running">Syncing read state…</string>
-  <string name="commafeed_sync_complete">Read sync finished</string>
-  <string name="commafeed_sync_already_same">Already same: %1$d</string>
-  <string name="commafeed_sync_local_marked">FeederD marked read: %1$d</string>
-  <string name="commafeed_sync_remote_marked">CommaFeed marked read: %1$d</string>
-  <string name="commafeed_sync_failed_writes">Failed writes: FeederD %1$d, CommaFeed %2$d</string>
-  <string name="commafeed_sync_network_error">Network failure before synchronization.</string>
-  <string name="commafeed_sync_fetch_error">CommaFeed article fetch failed.</string>
-  <string name="commafeed_sync_processing_error">Read sync processing failed.</string>
-  <string name="commafeed_sync_remote_write_error">Some CommaFeed mark-read writes failed or could not be confirmed.</string>
-  <string name="commafeed_sync_local_write_error">Some FeederD mark-read writes failed.</string>
-  <string name="commafeed_sync_verification_error">Could not re-fetch CommaFeed entries to verify remote writes.</string>
 
   <string name="navigation_drawer_open">Open navigation drawer</string>
   <string name="navigation_drawer_close">Close navigation drawer</string>
@@ -468,14 +414,4 @@
   <string name="no_unread_articles">There are no unread articles</string>
   <string name="retry">Retry</string>
   <string name="open_recommended_articles">Open recommended articles</string>
-    <string name="commafeed_manual_sync">Sync with CommaFeed</string>
-    <string name="commafeed_save_password">Save password on this device</string>
-    <string name="commafeed_password_saved">Password saved (enter a new password to replace it)</string>
-    <string name="commafeed_delete_password">Delete saved password</string>
-    <string name="commafeed_missing_configuration">Configure the CommaFeed Base URL and username in Settings first.</string>
-    <string name="commafeed_credential_unavailable">Unable to use or save the CommaFeed password. Please enter it again.</string>
-    <string name="commafeed_empty_password">Enter a CommaFeed password.</string>
-    <string name="commafeed_manual_complete">CommaFeed sync complete. FeederD: %1$d / CommaFeed: %2$d</string>
-    <string name="commafeed_manual_unchanged">CommaFeed sync complete (no changes)</string>
-    <string name="commafeed_manual_partial">CommaFeed sync finished. %1$d successful / %2$d failed</string>
 </resources>

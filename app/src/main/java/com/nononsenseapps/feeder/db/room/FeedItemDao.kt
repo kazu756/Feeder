@@ -10,7 +10,6 @@ import androidx.room.Query
 import androidx.room.RawQuery
 import androidx.room.Update
 import androidx.sqlite.db.SupportSQLiteQuery
-import com.nononsenseapps.feeder.commafeed.LocalArticle
 import com.nononsenseapps.feeder.db.COL_ID
 import com.nononsenseapps.feeder.db.COL_PLAINSNIPPET
 import com.nononsenseapps.feeder.db.COL_TITLE
@@ -24,21 +23,6 @@ import java.time.Instant
 
 @Dao
 interface FeedItemDao {
-    @Query(
-        """
-        SELECT feed_items.id AS id, feed_items.feed_id AS feedId,
-            feeds.url AS feedUrl, feeds.title AS feedTitle,
-            feed_items.guid AS guid, feed_items.link AS url,
-            feed_items.plain_title AS title,
-            (feed_items.read_time IS NOT NULL) AS read
-        FROM feed_items INNER JOIN feeds ON feed_items.feed_id = feeds.id
-        WHERE feeds.url IN (:feedUrls)
-        ORDER BY feed_items.primary_sort_time DESC, feed_items.pub_date DESC
-        LIMIT 1000
-        """,
-    )
-    suspend fun loadForCommaFeedDiagnostic(feedUrls: List<String>): List<LocalArticle>
-
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertFeedItem(item: FeedItem): Long
 

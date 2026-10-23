@@ -180,17 +180,6 @@ fun FeedScreen(
     viewModel: FeedViewModel,
     navDrawerListState: LazyListState,
 ) {
-    val commaFeedBusy by viewModel.commaFeed.busy.collectAsStateWithLifecycle()
-    val commaFeedPrompt by viewModel.commaFeed.prompt.collectAsStateWithLifecycle()
-    val commaFeedResult by viewModel.commaFeed.syncState.collectAsStateWithLifecycle()
-    CommaFeedManualSyncDialog(
-        prompt = commaFeedPrompt,
-        state = commaFeedResult,
-        busy = commaFeedBusy,
-        onSubmit = viewModel.commaFeed::submitPassword,
-        onDismissPrompt = viewModel.commaFeed::dismissPrompt,
-        onDismissResult = { viewModel.commaFeed.consumeResult(commaFeedResult) },
-    )
     val toastMaker: ToastMaker by instance()
     val viewState: FeedScreenViewState by viewModel.viewState.collectAsStateWithLifecycle()
     val canSummarize by viewModel.canSummarize.collectAsStateWithLifecycle()
@@ -305,8 +294,6 @@ fun FeedScreen(
     ) {
         FeedScreen(
             viewState = viewState,
-            commaFeedBusy = commaFeedBusy,
-            onCommaFeedSync = viewModel.commaFeed::requestSync,
             onRefreshVisible = {
                 viewModel.requestImmediateSyncOfCurrentFeedOrTag()
             },
@@ -589,8 +576,6 @@ fun FeedScreen(
     pagedFeedItems: LazyPagingItems<FeedListItem>,
     translatedFeedCards: TranslatedFeedCards,
     onTranslateFeedCard: (FeedListItem) -> Unit,
-    commaFeedBusy: Boolean = false,
-    onCommaFeedSync: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -860,14 +845,6 @@ fun FeedScreen(
                                     onShowToolbarMenu(false)
                                 },
                         ) {
-                            DropdownMenuItem(
-                                enabled = !commaFeedBusy,
-                                text = { Text(stringResource(if (commaFeedBusy) R.string.commafeed_sync_running else R.string.commafeed_manual_sync)) },
-                                onClick = {
-                                    onShowToolbarMenu(false)
-                                    onCommaFeedSync()
-                                },
-                            )
                             if (canSummarize) {
                                 DropdownMenuItem(
                                     onClick = {
