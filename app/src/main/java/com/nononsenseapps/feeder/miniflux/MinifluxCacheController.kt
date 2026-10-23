@@ -4,10 +4,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import java.util.concurrent.atomic.AtomicBoolean
 
 data class MinifluxCacheState(
@@ -17,6 +21,10 @@ data class MinifluxCacheState(
     val count: Int = 0,
     val failed: Boolean = false,
     val completed: Boolean = false,
+    val remaining: Int? = null,
+    val readStates: Boolean = false,
+    val readResult: MinifluxReadSyncResult? = null,
+    val errorType: String? = null,
 )
 
 class MinifluxCacheController(
@@ -24,6 +32,9 @@ class MinifluxCacheController(
     private val credentials: MinifluxCredentialStore,
     private val sync: MinifluxCacheSync,
     private val scope: CoroutineScope,
+    private val readSync: MinifluxReadSync,
+    val readMutations: MinifluxReadMutationStore,
+    private val manualTimeoutMillis: Long = 65_000,
 ) {
     private val mutableState = MutableStateFlow(MinifluxCacheState())
     val state = mutableState.asStateFlow()
@@ -46,31 +57,49 @@ class MinifluxCacheController(
         }
     }
 
-    fun syncCache(baseUrl: String) {
+    fun syncCache(
+        baseUrl: String,
+        readStates: Boolean = false,
+    ) {
         if (!active.compareAndSet(false, true)) return
-        mutableState.update { it.copy(busy = true, failed = false, completed = false, stage = "account", count = 0) }
+        mutableState.update { it.copy(busy = true, failed = false, completed = false, remaining = null, readResult = null, errorType = null, readStates = readStates, stage = "account", count = 0) }
         job =
             scope
                 .launch(Dispatchers.IO) {
                     try {
-                        val base = normalizedMinifluxUrl(baseUrl).toString()
-                        val token = credentials.loadToken(base) ?: throw MinifluxFailure(MinifluxError.MISSING_TOKEN)
-                        val summary = sync.sync(base, token) { stage, count -> mutableState.update { it.copy(stage = stage, count = count) } }
-                        mutableState.update { it.copy(summary = summary, completed = true) }
+                        withTimeout(if (readStates) manualTimeoutMillis else Long.MAX_VALUE) {
+                            val base = normalizedMinifluxUrl(baseUrl).toString()
+                            val token = credentials.loadToken(base) ?: throw MinifluxFailure(MinifluxError.MISSING_TOKEN)
+                            if (readStates) {
+                                val profile = store.selectedProfile() ?: throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
+                                if (profile.baseUrl != base) throw MinifluxFailure(MinifluxError.FORBIDDEN)
+                                val result = readSync.syncWithResult(profile, token)
+                                // A finished run may intentionally leave newer/unconfirmed pending rows.
+                                mutableState.update { it.copy(remaining = result.pending, readResult = result, completed = true) }
+                            } else {
+                                val summary = sync.sync(base, token) { stage, count -> mutableState.update { it.copy(stage = stage, count = count) } }
+                                mutableState.update { it.copy(summary = summary, completed = true) }
+                            }
+                        }
+                    } catch (e: TimeoutCancellationException) {
+                        currentCoroutineContext().ensureActive()
+                        mutableState.update { it.copy(failed = true, errorType = "TIMEOUT") }
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (_: Exception) {
-                        mutableState.update { it.copy(failed = true) }
+                    } catch (e: Exception) {
+                        mutableState.update { it.copy(failed = true, errorType = (e as? MinifluxFailure)?.error?.name ?: "LOCAL_ERROR") }
                     } finally {
-                        // Partial cache remains available; it is never marked complete on failure/cancel.
-                        try {
-                            store.selectedProfile()?.let { profile ->
-                                mutableState.update { it.copy(summary = store.summary(profile)) }
+                        if (!readStates) {
+                            // Partial cache remains available; it is never marked complete on failure/cancel.
+                            try {
+                                store.selectedProfile()?.let { profile ->
+                                    mutableState.update { it.copy(summary = store.summary(profile)) }
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                // Keep last known counts.
                             }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (_: Exception) {
-                            // Keep last known counts.
                         }
                     }
                 }.also { operation ->

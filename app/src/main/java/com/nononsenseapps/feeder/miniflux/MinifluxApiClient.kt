@@ -4,17 +4,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
 import java.io.InterruptedIOException
 import java.net.URI
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLException
 import kotlin.coroutines.resume
@@ -50,7 +54,7 @@ fun validateMinifluxToken(token: String) {
     if (token.length > 4096 || token.any { it.code !in 33..126 }) throw MinifluxFailure(MinifluxError.INVALID_TOKEN)
 }
 
-/** GET-only diagnostic client. Never inherits Feeder's header logging or cache interceptors. */
+/** Isolated client: diagnostics use GET; the only mutation is explicit read/unread status. */
 class MinifluxApiClient internal constructor(
     private val client: OkHttpClient,
 ) {
@@ -67,6 +71,26 @@ class MinifluxApiClient internal constructor(
     )
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    suspend fun entry(
+        base: HttpUrl,
+        token: String,
+        id: Long,
+    ): MinifluxEntry {
+        require(id > 0)
+        return decode(get(base, token, "v1/entries/$id"))
+    }
+
+    suspend fun updateReadStatus(
+        base: HttpUrl,
+        token: String,
+        ids: List<Long>,
+        status: String,
+    ) {
+        require(ids.isNotEmpty() && ids.size <= 50 && ids.all { it > 0 } && ids.distinct().size == ids.size)
+        require(status in setOf("read", "unread"))
+        get(base, token, "v1/entries", readUpdate = json.encodeToString(MinifluxReadUpdate(ids, status)))
+    }
 
     suspend fun me(
         base: HttpUrl,
@@ -127,6 +151,7 @@ class MinifluxApiClient internal constructor(
         path: String,
         sample: Boolean = false,
         query: Map<String, String> = emptyMap(),
+        readUpdate: String? = null,
     ): String =
         withContext(Dispatchers.IO) {
             // Revalidate even for callers constructing an HttpUrl directly.
@@ -151,8 +176,14 @@ class MinifluxApiClient internal constructor(
                         .url(url)
                         .header("X-Auth-Token", token)
                         .header("Accept", "application/json")
-                        .get()
-                        .build(),
+                        .apply {
+                            if (readUpdate == null) {
+                                get()
+                            } else {
+                                check(path == "v1/entries" && !sample && query.isEmpty())
+                                put(readUpdate.toRequestBody("application/json".toMediaType()))
+                            }
+                        }.build(),
                 )
             suspendCancellableCoroutine<Result<String>> { continuation ->
                 continuation.invokeOnCancellation { call.cancel() }
@@ -165,6 +196,7 @@ class MinifluxApiClient internal constructor(
                             val error =
                                 when (e) {
                                     is SSLException -> MinifluxError.TLS
+                                    is UnknownHostException -> MinifluxError.DNS
                                     is InterruptedIOException -> MinifluxError.TIMEOUT
                                     else -> MinifluxError.CONNECTION
                                 }

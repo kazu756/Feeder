@@ -166,6 +166,9 @@ class MinifluxCacheStoreTest {
                 local.commaFeedArticleMappingDao().upsert(mapping)
                 val profile = prepare()
                 store.saveEntry(profile, entry)
+                val mutations = MinifluxReadMutationStore(store)
+                mutations.setStatus(profile.id, entry.id, "read")
+                mutations.setStatus(profile.id, entry.id, "unread")
                 assertEquals("Local", local.feedDao().getFeed(feedId)!!.title)
                 assertEquals(Instant.EPOCH, local.feedItemDao().loadFeedItem(itemId)!!.readTime)
                 assertEquals(mapping, local.commaFeedArticleMappingDao().forServer("old-server").single())
@@ -187,7 +190,7 @@ class MinifluxCacheStoreTest {
             db.openHelper.readableDatabase
                 .query("PRAGMA foreign_key_check")
                 .use { assertEquals(0, it.count) }
-            assertEquals(1, db.openHelper.readableDatabase.version)
+            assertEquals(2, db.openHelper.readableDatabase.version)
             store.close()
             assertEquals(entry.content, store.readBody(profile.id, identity.localFeedItemId))
         }

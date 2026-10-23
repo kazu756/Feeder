@@ -151,7 +151,7 @@ private val MinifluxError.resource: Int
             MinifluxError.MISSING_TOKEN -> R.string.miniflux_missing_token
             MinifluxError.INVALID_TOKEN -> R.string.miniflux_invalid_token
             MinifluxError.CREDENTIAL_UNAVAILABLE -> R.string.miniflux_credential_error
-            MinifluxError.CONNECTION -> R.string.miniflux_network_error
+            MinifluxError.CONNECTION, MinifluxError.DNS -> R.string.miniflux_network_error
             MinifluxError.TIMEOUT -> R.string.miniflux_timeout
             MinifluxError.TLS -> R.string.miniflux_tls_error
             MinifluxError.UNAUTHORIZED -> R.string.miniflux_unauthorized

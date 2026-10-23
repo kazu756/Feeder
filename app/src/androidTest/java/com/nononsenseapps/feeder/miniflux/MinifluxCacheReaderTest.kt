@@ -112,4 +112,38 @@ class MinifluxCacheReaderTest {
         compose.waitUntil(10000) { compose.onAllNodesWithText(error).fetchSemanticsNodes().isNotEmpty() }
         assertEquals(0, server.requestCount)
     }
+
+    @Test fun explicitReadUnreadShowsPendingAndConfirmationUpdatesOpenPreview() {
+        val profile = prepare()
+        compose.setContent { WithAllPreviewProviders { MinifluxCachePreview(store, profile, {}) } }
+        compose.waitUntil(10000) { compose.onAllNodesWithText("Cached title").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Cached title").performClick()
+        val markRead = app.getString(R.string.miniflux_mark_read)
+        val markUnread = app.getString(R.string.miniflux_mark_unread)
+        val pending = app.getString(R.string.miniflux_read_pending)
+        compose.onNodeWithText(markRead).performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText(pending).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(markUnread).assertExists()
+        runBlocking {
+            val remote = MinifluxEntry(9000, 5000, "Cached title", "unread", true, "2026-10-23T00:00:00Z", null, server.url("/article").toString(), content = "<p>Cached body</p>")
+            store.saveEntry(profile, remote)
+        }
+        compose.onNodeWithText(markUnread).assertExists()
+        compose.onNodeWithText(pending).assertExists()
+        server.enqueue(okhttp3.mockwebserver.MockResponse().setBody("""{"id":42,"username":"test"}"""))
+        server.enqueue(okhttp3.mockwebserver.MockResponse().setResponseCode(204))
+        server.enqueue(
+            okhttp3.mockwebserver.MockResponse().setBody(
+                """{"id":9000,"feed_id":5000,"title":"Cached title","status":"read","starred":true,"published_at":"2026-10-23T00:00:00Z","url":"https://example.com/a"}""",
+            ),
+        )
+        runBlocking { assertEquals(0, MinifluxReadSync(MinifluxApiClient(), store, MinifluxReadMutationStore(store)).sync(profile, "test-token")) }
+        compose.waitUntil(10000) { compose.onAllNodesWithText(pending).fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText(markUnread).performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText(pending).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(markRead).assertExists()
+        compose.onNodeWithTag("readerColumn").assertExists()
+        runBlocking { assertEquals("unread", store.articles(profile.id, 0).single().effectiveStatus) }
+        assertEquals(3, server.requestCount)
+    }
 }

@@ -48,7 +48,7 @@ class SettingsViewModel(
     private val openAIApi: OpenAIApi by instance()
     private val bergamotModelManager: BergamotModelManager by instance()
 
-    val minifluxCache = MinifluxCacheController(di.direct.instance(), di.direct.instance(), di.direct.instance(), viewModelScope)
+    val minifluxCache = MinifluxCacheController(di.direct.instance(), di.direct.instance(), di.direct.instance(), viewModelScope, di.direct.instance(), di.direct.instance())
 
     val miniflux = MinifluxSettingsController(context, di.direct.instance(), di.direct.instance(), viewModelScope)
 

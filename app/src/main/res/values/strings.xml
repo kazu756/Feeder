@@ -459,8 +459,17 @@
   <string name="miniflux_cache_last">Last successful cache sync: %1$s</string>
   <string name="miniflux_cache_preview">View cached articles</string>
   <string name="miniflux_cache_back">Back</string>
-  <string name="miniflux_cache_read_only">Read-only preview. Opening articles does not change Miniflux read/star status. History, translation, Summary and external media are disabled in M2.</string>
+  <string name="miniflux_cache_read_only">Opening an article does not change its status. Explicit read/unread changes wait for manual sync. Star changes, history, translation, Summary and external media are disabled.</string>
   <string name="miniflux_cache_body_missing">Cached body is missing, incomplete or unreadable. Retry manual cache sync. RSS and original-content fetch are not used.</string>
   <string name="miniflux_cache_more">Load next 50 cached articles</string>
   <string name="miniflux_cache_loading">Loading cached body…</string>
+    <string name="miniflux_read_sync">Sync read states with Miniflux (experimental)</string>
+    <string name="miniflux_read_remaining">Pending read states: %1$d</string>
+    <string name="miniflux_read_pending">Pending sync</string>
+    <string name="miniflux_mark_read">Mark read</string>
+    <string name="miniflux_mark_unread">Mark unread</string>
+    <string name="miniflux_read_local_failed">Could not save the local change. Try again.</string>
+    <string name="miniflux_read_complete">Read-state sync attempt finished.</string>
+    <string name="miniflux_read_result">Requested: %1$d · Confirmed: %2$d · Pending: %3$d · Failed: %4$d</string>
+    <string name="miniflux_read_error">Sync stopped: %1$s. Unconfirmed changes remain pending.</string>
 </resources>

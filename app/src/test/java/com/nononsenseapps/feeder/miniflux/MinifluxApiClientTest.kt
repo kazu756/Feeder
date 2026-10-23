@@ -226,7 +226,7 @@ class MinifluxApiClientTest {
         runBlocking<Unit> {
             for ((transportError, expected) in listOf(
                 javax.net.ssl.SSLHandshakeException(token) to MinifluxError.TLS,
-                java.net.UnknownHostException(token) to MinifluxError.CONNECTION,
+                java.net.UnknownHostException(token) to MinifluxError.DNS,
                 java.net.ConnectException(token) to MinifluxError.CONNECTION,
             )) {
                 val call = io.mockk.mockk<okhttp3.Call>(relaxed = true)

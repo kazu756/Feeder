@@ -1,5 +1,6 @@
 package com.nononsenseapps.feeder.miniflux
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -13,9 +14,12 @@ import androidx.room.Transaction
 import androidx.room.TypeConverters
 import androidx.room.Update
 import androidx.room.Upsert
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.nononsenseapps.feeder.db.room.Converters
 import com.nononsenseapps.feeder.db.room.Feed
 import com.nononsenseapps.feeder.db.room.FeedItem
+import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "miniflux_profiles", indices = [Index(value = ["baseUrl", "userId"], unique = true)])
 data class MinifluxProfile(
@@ -77,10 +81,54 @@ data class MinifluxEntryIdentity(
     val remoteCreatedAt: String?,
     val contentHash: String,
     val blobReady: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val readGeneration: Long = 0,
+)
+
+@Entity(
+    tableName = "miniflux_read_outbox",
+    primaryKeys = ["profileId", "remoteEntryId"],
+    foreignKeys = [ForeignKey(entity = MinifluxEntryIdentity::class, parentColumns = ["profileId", "remoteEntryId"], childColumns = ["profileId", "remoteEntryId"])],
+    indices = [Index(value = ["profileId", "updatedAt"])],
+)
+data class MinifluxReadOutbox(
+    val profileId: String,
+    val remoteEntryId: Long,
+    val desiredStatus: String,
+    val generation: Long,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val lastAttemptAt: Long? = null,
+    val attemptCount: Int = 0,
+    val lastErrorType: String? = null,
+    val lastErrorAt: Long? = null,
 )
 
 @Dao
 interface MinifluxCacheDao {
+    @Query("SELECT * FROM miniflux_read_outbox WHERE profileId=:profile AND remoteEntryId=:remote")
+    suspend fun pending(
+        profile: String,
+        remote: Long,
+    ): MinifluxReadOutbox?
+
+    @Query("SELECT * FROM miniflux_read_outbox WHERE profileId=:profile ORDER BY updatedAt, remoteEntryId")
+    suspend fun pending(profile: String): List<MinifluxReadOutbox>
+
+    @Query("SELECT * FROM miniflux_read_outbox")
+    fun observePending(): Flow<List<MinifluxReadOutbox>>
+
+    @Query("SELECT * FROM miniflux_entry_identity ORDER BY remoteEntryId DESC LIMIT :limit")
+    fun observeEntries(limit: Int): Flow<List<MinifluxEntryIdentity>>
+
+    @Upsert suspend fun savePending(row: MinifluxReadOutbox)
+
+    @Query("DELETE FROM miniflux_read_outbox WHERE profileId=:profile AND remoteEntryId=:remote AND generation=:generation")
+    suspend fun acknowledge(
+        profile: String,
+        remote: Long,
+        generation: Long,
+    ): Int
+
     @Query("SELECT * FROM miniflux_profiles LIMIT 1")
     suspend fun profile(): MinifluxProfile?
 
@@ -147,11 +195,34 @@ interface MinifluxCacheDao {
 
     @Query("SELECT * FROM miniflux_entry_identity WHERE localFeedItemId=:id")
     suspend fun identityForLocal(id: Long): MinifluxEntryIdentity?
+
+    @Query("UPDATE miniflux_entry_identity SET blobReady=1 WHERE profileId=:profile AND remoteEntryId=:remote AND contentHash=:hash")
+    suspend fun markBlobReady(
+        profile: String,
+        remote: Long,
+        hash: String,
+    )
 }
 
 /** Entirely separate from AppDatabase and its singleton/DAOs. One physical database per profile. */
-@Database(entities = [Feed::class, FeedItem::class, MinifluxProfile::class, MinifluxCachedCategory::class, MinifluxFeedIdentity::class, MinifluxEntryIdentity::class], version = 1)
+@Database(
+    entities = [Feed::class, FeedItem::class, MinifluxProfile::class, MinifluxCachedCategory::class, MinifluxFeedIdentity::class, MinifluxEntryIdentity::class, MinifluxReadOutbox::class],
+    version = 2,
+)
 @TypeConverters(Converters::class)
 abstract class MinifluxCacheDatabase : RoomDatabase() {
     abstract fun cacheDao(): MinifluxCacheDao
+
+    companion object {
+        val MIGRATION_1_2 =
+            object : Migration(1, 2) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE miniflux_entry_identity ADD COLUMN readGeneration INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS miniflux_read_outbox (profileId TEXT NOT NULL, remoteEntryId INTEGER NOT NULL, desiredStatus TEXT NOT NULL, generation INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, lastAttemptAt INTEGER, attemptCount INTEGER NOT NULL, lastErrorType TEXT, lastErrorAt INTEGER, PRIMARY KEY(profileId, remoteEntryId), FOREIGN KEY(profileId, remoteEntryId) REFERENCES miniflux_entry_identity(profileId, remoteEntryId) ON UPDATE NO ACTION ON DELETE NO ACTION)",
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_miniflux_read_outbox_profileId_updatedAt ON miniflux_read_outbox (profileId, updatedAt)")
+                }
+            }
+    }
 }

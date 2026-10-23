@@ -304,8 +304,17 @@
   <string name="miniflux_cache_last">最終キャッシュ同期成功：%1$s</string>
   <string name="miniflux_cache_preview">キャッシュ済み記事を確認</string>
   <string name="miniflux_cache_back">戻る</string>
-  <string name="miniflux_cache_read_only">読み取り専用previewです。記事を開いてもMinifluxの既読・starは変わりません。M2では履歴記録・翻訳・Summary・外部メディア読込を無効にしています。</string>
+  <string name="miniflux_cache_read_only">記事を開くだけでは状態を変更しません。明示的な既読・未読操作は手動同期まで端末に保留します。star変更・履歴・翻訳・Summary・外部メディア読込は無効です。</string>
   <string name="miniflux_cache_body_missing">本文キャッシュが欠損・未完了・読込不能です。手動キャッシュ同期を再実行してください。RSS・独自全文取得にはfallbackしません。</string>
   <string name="miniflux_cache_more">次の50件を表示</string>
   <string name="miniflux_cache_loading">キャッシュ本文を読込中…</string>
+    <string name="miniflux_read_sync">Minifluxと既読状態を同期（試験的）</string>
+    <string name="miniflux_read_remaining">同期待ちの既読状態: %1$d件</string>
+    <string name="miniflux_read_pending">同期待ち</string>
+    <string name="miniflux_mark_read">既読にする</string>
+    <string name="miniflux_mark_unread">未読に戻す</string>
+    <string name="miniflux_read_local_failed">端末への変更を保存できませんでした。再度お試しください。</string>
+    <string name="miniflux_read_complete">既読状態の同期処理が終了しました。</string>
+    <string name="miniflux_read_result">対象: %1$d件・確認: %2$d件・保留: %3$d件・失敗: %4$d件</string>
+    <string name="miniflux_read_error">同期を終了しました: %1$s。未確認の変更は保留しています。</string>
 </resources>

@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -38,10 +39,11 @@ import com.nononsenseapps.feeder.ui.compose.utils.ScreenType
 import com.nononsenseapps.feeder.util.articleBaseUrl
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 
-/** No Repository/ArticleViewModel: opening this preview cannot mutate RSS, read state, or history. */
+/** No Repository/ArticleViewModel: opening has no side effects; explicit edits use the outbox. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MinifluxCachePreview(
@@ -49,17 +51,34 @@ fun MinifluxCachePreview(
     profile: MinifluxProfile,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    mutations: MinifluxReadMutationStore = MinifluxReadMutationStore(store),
 ) {
     var entries by remember(profile.id) { mutableStateOf<List<MinifluxCachedArticle>>(emptyList()) }
-    var offset by remember(profile.id) { mutableIntStateOf(0) }
+    var limit by remember(profile.id) { mutableIntStateOf(50) }
     var more by remember(profile.id) { mutableStateOf(true) }
     var failed by remember(profile.id) { mutableStateOf(false) }
-    var selected by remember(profile.id) { mutableStateOf<MinifluxCachedArticle?>(null) }
-    LaunchedEffect(profile.id, offset) {
+    var selected by remember(profile.id) { mutableStateOf<Long?>(null) }
+    val scope = rememberCoroutineScope()
+    var mutationFailed by remember { mutableStateOf(false) }
+
+    fun change(entry: MinifluxCachedArticle) {
+        scope.launch {
+            try {
+                mutations.toggleStatus(profile.id, entry.identity.remoteEntryId)
+                mutationFailed = false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                mutationFailed = true
+            }
+        }
+    }
+    LaunchedEffect(profile.id, limit) {
         try {
-            val page = store.articles(profile.id, offset)
-            entries = if (offset == 0) page else entries + page
-            more = page.size == 50
+            store.observeArticles(profile.id, limit).collect { page ->
+                entries = page
+                more = page.size == limit
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -74,29 +93,48 @@ fun MinifluxCachePreview(
         }) { padding ->
             Column(Modifier.padding(padding)) {
                 Text(stringResource(R.string.miniflux_cache_read_only), modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.bodySmall)
-                val article = selected
+                if (mutationFailed) Text(stringResource(R.string.miniflux_read_local_failed))
+                val article = entries.firstOrNull { it.identity.remoteEntryId == selected }
                 if (article != null) {
+                    ReadStateControls(article, onChange = { change(article) })
                     MinifluxCachedReader(store, profile.id, article)
                 } else {
                     Text("${profile.baseUrl} · ${profile.username}", modifier = Modifier.padding(8.dp))
                     if (failed) Text(stringResource(R.string.miniflux_cache_body_missing))
                     LazyColumn {
                         items(entries, key = { it.identity.remoteEntryId }) { entry ->
-                            Column(Modifier.clickable { selected = entry }.padding(12.dp)) {
+                            Column(Modifier.clickable { selected = entry.identity.remoteEntryId }.padding(12.dp)) {
                                 Text(entry.item.plainTitle, style = MaterialTheme.typography.titleMedium)
                                 Text("${entry.feed.title} · ${entry.feed.tag}")
-                                Text("${entry.item.pubDate ?: ""} · ${entry.identity.remoteStatus} · starred=${entry.identity.remoteStarred}")
+                                Text("${entry.item.pubDate ?: ""} · ${entry.effectiveStatus} · starred=${entry.identity.remoteStarred}")
+                                ReadStateControls(entry, onChange = { change(entry) })
                                 Spacer(Modifier.height(4.dp))
                             }
                         }
                         if (more) {
                             item {
-                                TextButton(onClick = { offset = entries.size }) { Text(stringResource(R.string.miniflux_cache_more)) }
+                                TextButton(onClick = { limit += 50 }) { Text(stringResource(R.string.miniflux_cache_more)) }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ReadStateControls(
+    article: MinifluxCachedArticle,
+    onChange: () -> Unit,
+) {
+    Column {
+        TextButton(onClick = onChange) {
+            Text(stringResource(if (article.effectiveStatus == "read") R.string.miniflux_mark_unread else R.string.miniflux_mark_read))
+        }
+        article.pending?.let {
+            Text(stringResource(R.string.miniflux_read_pending), style = MaterialTheme.typography.bodySmall)
+            it.lastErrorType?.let { error -> Text(error, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }

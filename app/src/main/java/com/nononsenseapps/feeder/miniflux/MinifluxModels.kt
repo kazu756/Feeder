@@ -51,6 +51,7 @@ data class MinifluxVersion(
 )
 
 enum class MinifluxError {
+    DNS,
     MISSING_URL,
     INVALID_URL,
     MISSING_TOKEN,
@@ -68,6 +69,12 @@ enum class MinifluxError {
     INVALID_RESPONSE,
     RESPONSE_TOO_LARGE,
 }
+
+@Serializable
+internal data class MinifluxReadUpdate(
+    @SerialName("entry_ids") val entryIds: List<Long>,
+    val status: String,
+)
 
 // Deliberately contains no response text, URL, original exception, or credential.
 class MinifluxFailure(
