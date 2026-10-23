@@ -19,6 +19,7 @@ import com.nononsenseapps.feeder.archmodel.ThemeOptions
 import com.nononsenseapps.feeder.base.DIAwareViewModel
 import com.nononsenseapps.feeder.localtranslation.BergamotModelManager
 import com.nononsenseapps.feeder.localtranslation.LanguagePairInfo
+import com.nononsenseapps.feeder.miniflux.MinifluxSettingsController
 import com.nononsenseapps.feeder.openai.OpenAIApi
 import com.nononsenseapps.feeder.openai.canUseAsTranslationApi
 import com.nononsenseapps.feeder.ui.compose.settings.FontSelection.SystemDefault
@@ -34,6 +35,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import org.kodein.di.DI
+import org.kodein.di.direct
 import org.kodein.di.instance
 
 class SettingsViewModel(
@@ -44,6 +46,8 @@ class SettingsViewModel(
     private val applicationCoroutineScope: ApplicationCoroutineScope by instance()
     private val openAIApi: OpenAIApi by instance()
     private val bergamotModelManager: BergamotModelManager by instance()
+
+    val miniflux = MinifluxSettingsController(context, di.direct.instance(), di.direct.instance(), viewModelScope)
 
     fun setCurrentTheme(value: ThemeOptions) {
         repository.setCurrentTheme(value)

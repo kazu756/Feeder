@@ -1,5 +1,9 @@
 package com.nononsenseapps.feeder.di
 
+import android.app.Application
+import com.nononsenseapps.feeder.miniflux.MinifluxApiClient
+import com.nononsenseapps.feeder.miniflux.MinifluxCredentialStore
+import com.nononsenseapps.feeder.miniflux.MinifluxDiagnosticService
 import com.nononsenseapps.feeder.model.FeedParser
 import com.nononsenseapps.feeder.model.FullTextParser
 import com.nononsenseapps.feeder.model.RssLocalSync
@@ -17,6 +21,9 @@ import org.kodein.di.singleton
 
 val networkModule =
     DI.Module(name = "network") {
+        bind<MinifluxApiClient>() with singleton { MinifluxApiClient() }
+        bind<MinifluxCredentialStore>() with singleton { MinifluxCredentialStore(instance<Application>()) }
+        bind<MinifluxDiagnosticService>() with singleton { MinifluxDiagnosticService(instance()) }
         // Parsers can carry state so safer to use providers
         bind<JsonAdapter<Feed>>() with provider { feedAdapter() }
         bind<JsonFeedParser>() with provider { JsonFeedParser(instance<OkHttpClient>(), instance()) }

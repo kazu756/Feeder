@@ -264,6 +264,7 @@ fun SettingsScreen(
             forceSingleColumn = viewState.forceSingleColumn,
             onForceSingleColumnChange = settingsViewModel::setForceSingleColumn,
             modifier = Modifier.padding(padding),
+            minifluxSection = { MinifluxDiagnosticSection(settingsViewModel.miniflux) },
         )
     }
 }
@@ -450,6 +451,7 @@ fun SettingsList(
     forceSingleColumn: Boolean,
     onForceSingleColumnChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    minifluxSection: @Composable () -> Unit = {},
 ) {
     val scrollState = rememberScrollState()
     val dimens = LocalDimens.current
@@ -948,6 +950,8 @@ fun SettingsList(
         )
 
         HorizontalDivider(modifier = Modifier.width(dimens.maxContentWidth))
+
+        minifluxSection()
 
         Spacer(modifier = Modifier.navigationBarsPadding())
     }
