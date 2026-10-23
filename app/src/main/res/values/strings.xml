@@ -451,4 +451,16 @@
   <string name="miniflux_redirect_error">Redirect refused. Enter the final server root URL.</string>
   <string name="miniflux_json_error">Invalid JSON or unexpected API response.</string>
   <string name="miniflux_response_large">Diagnostic response exceeded the size limit.</string>
+  <string name="miniflux_cache_scope">Separate read-only cache: all unread and starred entries, plus up to 1000 read entries from the last 30 days. Local RSS is unchanged.</string>
+  <string name="miniflux_cache_sync">Sync Miniflux cache (read-only)</string>
+  <string name="miniflux_cache_failed">Cache sync did not complete (%1$s, page %2$d). Existing cache is retained; retry manual sync.</string>
+  <string name="miniflux_cache_complete">Cache sync completed. Miniflux read/star status has not been changed.</string>
+  <string name="miniflux_cache_counts">Feeds: %1$d · Categories: %2$d · Entries: %3$d · Content blobs: %4$d</string>
+  <string name="miniflux_cache_last">Last successful cache sync: %1$s</string>
+  <string name="miniflux_cache_preview">View cached articles</string>
+  <string name="miniflux_cache_back">Back</string>
+  <string name="miniflux_cache_read_only">Read-only preview. Opening articles does not change Miniflux read/star status. History, translation, Summary and external media are disabled in M2.</string>
+  <string name="miniflux_cache_body_missing">Cached body is missing, incomplete or unreadable. Retry manual cache sync. RSS and original-content fetch are not used.</string>
+  <string name="miniflux_cache_more">Load next 50 cached articles</string>
+  <string name="miniflux_cache_loading">Loading cached body…</string>
 </resources>

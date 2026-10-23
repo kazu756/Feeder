@@ -296,4 +296,16 @@
   <string name="miniflux_redirect_error">redirectを拒否しました。転送先のサーバールートURLを入力してください。</string>
   <string name="miniflux_json_error">JSONまたはAPI応答形式が不正です。</string>
   <string name="miniflux_response_large">診断応答がサイズ上限を超えました。</string>
+  <string name="miniflux_cache_scope">独立した読み取り専用キャッシュ：未読全件・starred全件・直近30日の既読（最大1000件）。通常RSSは従来どおりです。</string>
+  <string name="miniflux_cache_sync">Minifluxキャッシュを同期（読み取り専用）</string>
+  <string name="miniflux_cache_failed">キャッシュ同期は未完了です（%1$s・page %2$d）。既存キャッシュは保持しています。手動で再試行してください。</string>
+  <string name="miniflux_cache_complete">キャッシュ同期が完了しました。Minifluxの既読・star状態は変更していません。</string>
+  <string name="miniflux_cache_counts">Feed：%1$d · Category：%2$d · 記事：%3$d · 本文blob：%4$d</string>
+  <string name="miniflux_cache_last">最終キャッシュ同期成功：%1$s</string>
+  <string name="miniflux_cache_preview">キャッシュ済み記事を確認</string>
+  <string name="miniflux_cache_back">戻る</string>
+  <string name="miniflux_cache_read_only">読み取り専用previewです。記事を開いてもMinifluxの既読・starは変わりません。M2では履歴記録・翻訳・Summary・外部メディア読込を無効にしています。</string>
+  <string name="miniflux_cache_body_missing">本文キャッシュが欠損・未完了・読込不能です。手動キャッシュ同期を再実行してください。RSS・独自全文取得にはfallbackしません。</string>
+  <string name="miniflux_cache_more">次の50件を表示</string>
+  <string name="miniflux_cache_loading">キャッシュ本文を読込中…</string>
 </resources>

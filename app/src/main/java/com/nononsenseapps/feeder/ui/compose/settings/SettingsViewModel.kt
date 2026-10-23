@@ -19,6 +19,7 @@ import com.nononsenseapps.feeder.archmodel.ThemeOptions
 import com.nononsenseapps.feeder.base.DIAwareViewModel
 import com.nononsenseapps.feeder.localtranslation.BergamotModelManager
 import com.nononsenseapps.feeder.localtranslation.LanguagePairInfo
+import com.nononsenseapps.feeder.miniflux.MinifluxCacheController
 import com.nononsenseapps.feeder.miniflux.MinifluxSettingsController
 import com.nononsenseapps.feeder.openai.OpenAIApi
 import com.nononsenseapps.feeder.openai.canUseAsTranslationApi
@@ -46,6 +47,8 @@ class SettingsViewModel(
     private val applicationCoroutineScope: ApplicationCoroutineScope by instance()
     private val openAIApi: OpenAIApi by instance()
     private val bergamotModelManager: BergamotModelManager by instance()
+
+    val minifluxCache = MinifluxCacheController(di.direct.instance(), di.direct.instance(), di.direct.instance(), viewModelScope)
 
     val miniflux = MinifluxSettingsController(context, di.direct.instance(), di.direct.instance(), viewModelScope)
 

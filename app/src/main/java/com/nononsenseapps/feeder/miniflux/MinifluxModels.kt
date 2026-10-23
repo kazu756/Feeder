@@ -14,6 +14,8 @@ data class MinifluxFeed(
     val id: Long,
     val title: String,
     @SerialName("feed_url") val feedUrl: String,
+    val category: MinifluxCategory? = null,
+    @SerialName("site_url") val siteUrl: String = "",
 )
 
 @Serializable
@@ -32,6 +34,9 @@ data class MinifluxEntry(
     @SerialName("published_at") val publishedAt: String,
     @SerialName("changed_at") val changedAt: String? = null,
     val url: String,
+    val author: String? = null,
+    val content: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
 )
 
 @Serializable

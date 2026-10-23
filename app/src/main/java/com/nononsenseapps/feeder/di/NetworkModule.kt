@@ -2,6 +2,8 @@ package com.nononsenseapps.feeder.di
 
 import android.app.Application
 import com.nononsenseapps.feeder.miniflux.MinifluxApiClient
+import com.nononsenseapps.feeder.miniflux.MinifluxCacheStore
+import com.nononsenseapps.feeder.miniflux.MinifluxCacheSync
 import com.nononsenseapps.feeder.miniflux.MinifluxCredentialStore
 import com.nononsenseapps.feeder.miniflux.MinifluxDiagnosticService
 import com.nononsenseapps.feeder.model.FeedParser
@@ -21,6 +23,8 @@ import org.kodein.di.singleton
 
 val networkModule =
     DI.Module(name = "network") {
+        bind<MinifluxCacheStore>() with singleton { MinifluxCacheStore(instance<Application>()) }
+        bind<MinifluxCacheSync>() with singleton { MinifluxCacheSync(instance(), instance()) }
         bind<MinifluxApiClient>() with singleton { MinifluxApiClient() }
         bind<MinifluxCredentialStore>() with singleton { MinifluxCredentialStore(instance<Application>()) }
         bind<MinifluxDiagnosticService>() with singleton { MinifluxDiagnosticService(instance()) }

@@ -93,6 +93,25 @@ class MinifluxApiClient internal constructor(
         token: String,
     ): MinifluxVersion = decode(get(base, token, "v1/version"))
 
+    suspend fun cacheEntries(
+        base: HttpUrl,
+        token: String,
+        status: String? = null,
+        starred: Boolean? = null,
+        publishedAfter: Long? = null,
+        beforeId: Long? = null,
+        limit: Int = 100,
+    ): MinifluxEntries {
+        require(limit in 1..100)
+        require(status == null || status in setOf("read", "unread"))
+        val query = mutableMapOf("limit" to limit.toString(), "order" to "id", "direction" to "desc")
+        status?.let { query["status"] = it }
+        starred?.let { query["starred"] = it.toString() }
+        publishedAfter?.let { query["published_after"] = it.toString() }
+        beforeId?.let { query["before_entry_id"] = it.toString() }
+        return decode(get(base, token, "v1/entries", query = query))
+    }
+
     private inline fun <reified T> decode(body: String): T =
         try {
             json.decodeFromString<T>(body)
@@ -107,6 +126,7 @@ class MinifluxApiClient internal constructor(
         token: String,
         path: String,
         sample: Boolean = false,
+        query: Map<String, String> = emptyMap(),
     ): String =
         withContext(Dispatchers.IO) {
             // Revalidate even for callers constructing an HttpUrl directly.
@@ -117,6 +137,7 @@ class MinifluxApiClient internal constructor(
                     .newBuilder()
                     .addPathSegments(path)
                     .apply {
+                        query.forEach { (key, value) -> addQueryParameter(key, value) }
                         if (sample) {
                             addQueryParameter("limit", "10")
                             addQueryParameter("order", "id")

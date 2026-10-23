@@ -23,6 +23,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nononsenseapps.feeder.R
+import com.nononsenseapps.feeder.miniflux.MinifluxCacheController
+import com.nononsenseapps.feeder.miniflux.MinifluxCacheSection
 import com.nononsenseapps.feeder.miniflux.MinifluxError
 import com.nononsenseapps.feeder.miniflux.MinifluxSettingsController
 import com.nononsenseapps.feeder.miniflux.MinifluxStep
@@ -33,8 +35,15 @@ import com.nononsenseapps.feeder.ui.compose.theme.LocalDimens
 fun MinifluxDiagnosticSection(
     controller: MinifluxSettingsController,
     modifier: Modifier = Modifier,
+    cacheController: MinifluxCacheController? = null,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
+    val cacheBusy =
+        cacheController
+            ?.state
+            ?.collectAsStateWithLifecycle()
+            ?.value
+            ?.busy == true
     var baseUrl by remember(state.baseUrl) { mutableStateOf(state.baseUrl) }
     // Never saveable, in SavedStateHandle, or restored from the credential store.
     var token by remember { mutableStateOf("") }
@@ -44,7 +53,7 @@ fun MinifluxDiagnosticSection(
             OutlinedTextField(
                 value = baseUrl,
                 onValueChange = { baseUrl = it },
-                enabled = !state.busy,
+                enabled = !state.busy && !cacheBusy,
                 label = { Text(stringResource(R.string.miniflux_base_url)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
@@ -55,25 +64,25 @@ fun MinifluxDiagnosticSection(
             OutlinedTextField(
                 value = token,
                 onValueChange = { token = it },
-                enabled = !state.busy,
+                enabled = !state.busy && !cacheBusy,
                 label = { Text(stringResource(R.string.miniflux_api_token)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth(),
             )
-            Button(enabled = !state.busy, onClick = {
+            Button(enabled = !state.busy && !cacheBusy, onClick = {
                 val submitted = token
                 token = ""
                 controller.save(baseUrl, submitted)
             }) { Text(stringResource(R.string.miniflux_save_token)) }
-            TextButton(enabled = state.saved && !state.busy, onClick = {
+            TextButton(enabled = state.saved && !state.busy && !cacheBusy, onClick = {
                 token = ""
                 controller.clear()
             }) {
                 Text(stringResource(R.string.miniflux_delete_token))
             }
-            Button(enabled = !state.busy, onClick = {
+            Button(enabled = !state.busy && !cacheBusy, onClick = {
                 token = ""
                 controller.check(baseUrl)
             }) {
@@ -83,6 +92,7 @@ fun MinifluxDiagnosticSection(
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 TextButton(onClick = controller::cancel) { Text(stringResource(android.R.string.cancel)) }
             }
+            cacheController?.let { MinifluxCacheSection(it, baseUrl, enabled = !state.busy) }
             state.error?.let { Text(stringResource(it.resource)) }
             state.result?.let { result ->
                 Text(stringResource(if (result.account is MinifluxStep.Success) R.string.miniflux_connected else R.string.miniflux_connection_failed))
