@@ -106,6 +106,18 @@ data class MinifluxReadOutbox(
 
 @Dao
 interface MinifluxCacheDao {
+    @Query("SELECT * FROM miniflux_feed_identity")
+    suspend fun reconciliationFeeds(): List<MinifluxFeedIdentity>
+
+    @Query("SELECT * FROM feeds")
+    suspend fun reconciliationLocalFeeds(): List<Feed>
+
+    @Query("SELECT * FROM miniflux_entry_identity")
+    suspend fun reconciliationEntries(): List<MinifluxEntryIdentity>
+
+    @Query("SELECT * FROM feed_items")
+    suspend fun reconciliationItems(): List<FeedItem>
+
     @Query("SELECT changedAt FROM miniflux_entry_identity")
     suspend fun cachedChangeTimes(): List<MinifluxCachedChangeTime>
 

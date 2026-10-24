@@ -26,6 +26,7 @@ data class MinifluxCacheState(
     val readResult: MinifluxReadSyncResult? = null,
     val errorType: String? = null,
     val cacheResult: MinifluxCacheSyncResult? = null,
+    val deletionResult: MinifluxDeletionResult? = null,
 )
 
 class MinifluxCacheController(
@@ -61,10 +62,23 @@ class MinifluxCacheController(
     fun syncCache(
         baseUrl: String,
         readStates: Boolean = false,
+        deletionDryRun: Boolean = false,
     ) {
         if (!active.compareAndSet(false, true)) return
         mutableState.update {
-            it.copy(busy = true, failed = false, completed = false, remaining = null, readResult = null, cacheResult = null, errorType = null, readStates = readStates, stage = "account", count = 0)
+            it.copy(
+                busy = true,
+                failed = false,
+                completed = false,
+                remaining = null,
+                readResult = null,
+                cacheResult = null,
+                deletionResult = null,
+                errorType = null,
+                readStates = readStates,
+                stage = if (deletionDryRun) "dry-run" else "account",
+                count = 0,
+            )
         }
         job =
             scope
@@ -73,7 +87,12 @@ class MinifluxCacheController(
                         withTimeout(if (readStates) manualTimeoutMillis else MINIFLUX_CACHE_TIMEOUT_MS + 5000) {
                             val base = normalizedMinifluxUrl(baseUrl).toString()
                             val token = credentials.loadToken(base) ?: throw MinifluxFailure(MinifluxError.MISSING_TOKEN)
-                            if (readStates) {
+                            if (deletionDryRun) {
+                                val profile = store.selectedProfile() ?: throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
+                                if (profile.baseUrl != base) throw MinifluxFailure(MinifluxError.FORBIDDEN)
+                                val result = sync.deletionDryRun(profile, token)
+                                mutableState.update { it.copy(deletionResult = result) }
+                            } else if (readStates) {
                                 val profile = store.selectedProfile() ?: throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
                                 if (profile.baseUrl != base) throw MinifluxFailure(MinifluxError.FORBIDDEN)
                                 val result = readSync.syncWithResult(profile, token)
@@ -86,13 +105,18 @@ class MinifluxCacheController(
                         }
                     } catch (e: TimeoutCancellationException) {
                         currentCoroutineContext().ensureActive()
-                        mutableState.update { it.copy(failed = true, errorType = "TIMEOUT") }
+                        mutableState.update {
+                            if (deletionDryRun) it.copy(deletionResult = MinifluxDeletionResult(false, "TIMEOUT")) else it.copy(failed = true, errorType = "TIMEOUT")
+                        }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        mutableState.update { it.copy(failed = true, errorType = (e as? MinifluxFailure)?.error?.name ?: "LOCAL_ERROR") }
+                        val error = (e as? MinifluxFailure)?.error?.name ?: "LOCAL_ERROR"
+                        mutableState.update {
+                            if (deletionDryRun) it.copy(deletionResult = MinifluxDeletionResult(false, error)) else it.copy(failed = true, errorType = error)
+                        }
                     } finally {
-                        if (!readStates) {
+                        if (!readStates && !deletionDryRun) {
                             // Partial cache remains available; it is never marked complete on failure/cancel.
                             try {
                                 withTimeout(2000) {

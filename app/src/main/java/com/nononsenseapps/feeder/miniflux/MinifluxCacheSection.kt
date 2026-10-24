@@ -35,6 +35,40 @@ fun MinifluxCacheSection(
             Text(stringResource(R.string.miniflux_read_sync))
         }
         state.remaining?.let { Text(stringResource(R.string.miniflux_read_remaining, it)) }
+        Text(stringResource(R.string.miniflux_deletion_warning))
+        Button(enabled = enabled && !state.busy && state.summary != null, onClick = { controller.syncCache(baseUrl, deletionDryRun = true) }) {
+            Text(stringResource(R.string.miniflux_deletion_check))
+        }
+        state.deletionResult?.let { result ->
+            if (!result.complete) {
+                Text(stringResource(R.string.miniflux_deletion_incomplete, result.errorType ?: "UNKNOWN"))
+            } else {
+                Text(
+                    stringResource(
+                        R.string.miniflux_deletion_result,
+                        result.missingFeeds,
+                        result.removedEntries,
+                        result.confirmedMissingEntries,
+                        result.unverified,
+                        result.pending,
+                        result.starred,
+                        result.feedEntries,
+                    ),
+                )
+                Text(stringResource(R.string.miniflux_deletion_limit, result.feeds.size, result.missingFeeds, result.entries.size, result.removedEntries + result.feedEntries + result.unverified))
+                for (feed in result.feeds) {
+                    Text(
+                        "${feed.title} · Feed ${feed.remoteFeedId} / local ${feed.localFeedId}\n${feed.feedUrl}\n${feed.category}\n${feed.reason} · ${feed.confidence}\nEntries ${feed.entries} · Pending ${feed.pending} · Starred ${feed.starred} · Blobs ${feed.blobs}",
+                    )
+                }
+                for (entry in result.entries) {
+                    Text(
+                        "${entry.title} · Entry ${entry.remoteEntryId}\n${entry.feedTitle}\n${entry.reason} · ${entry.confidence} · ${entry.remoteStatus ?: "?"}\nPending ${entry.protectedByPending} · Starred ${entry.protectedByStarred} · Blob ${entry.blobBytes ?: 0} B",
+                    )
+                }
+            }
+            Text(stringResource(R.string.miniflux_deletion_warning))
+        }
         state.readResult?.let { result ->
             Text(stringResource(R.string.miniflux_read_result, result.requested, result.confirmed, result.pending, result.failed))
         }

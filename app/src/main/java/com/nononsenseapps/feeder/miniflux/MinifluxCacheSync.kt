@@ -32,6 +32,14 @@ class MinifluxCacheSync(
 ) {
     private val mutex = Mutex()
 
+    suspend fun deletionDryRun(
+        profile: MinifluxProfile,
+        token: String,
+    ): MinifluxDeletionResult =
+        withTimeout(timeoutMillis) {
+            mutex.withLock { MinifluxDeletionDryRun(api, store).run(profile, token) }
+        }
+
     suspend fun sync(
         baseUrl: String,
         token: String,

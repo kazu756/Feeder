@@ -321,4 +321,9 @@
     <string name="miniflux_cache_bootstrap">差分位置の初期化</string>
     <string name="miniflux_cache_incremental">差分</string>
     <string name="miniflux_cache_delta_result">%1$s: 取得%2$d・追加%3$d・更新%4$d・変更なし%5$d・重複除外%6$d・保留保護%7$d・本文更新%8$d・ページ%9$d</string>
+    <string name="miniflux_deletion_check">削除候補を確認（dry-run）</string>
+    <string name="miniflux_deletion_warning">確認のみ。変更は行っていません。ローカル記事や本文は削除しません。</string>
+    <string name="miniflux_deletion_incomplete">未完了: %1$s。BASELINE_REQUIREDの場合は初回cache同期を完了してください。候補は確定していません。</string>
+    <string name="miniflux_deletion_result">Remote Feed missing: %1$d\nMinifluxでremoved状態（完全削除とは異なります）: %2$d\n不存在確認済みEntry: %3$d\n未確認（一覧にないだけでは削除と判定しません）: %4$d\npending保護対象: %5$d\nstarred保護対象: %6$d\nmissing Feed配下Entry: %7$d</string>
+    <string name="miniflux_deletion_limit">Feed候補 %2$d件中先頭%1$d件、Entry観測 %4$d件中先頭%3$d件を表示。一時的な観測結果です。サーバーの同時点の状態は保証しません。保護フラグは開始時点の状態です。</string>
 </resources>

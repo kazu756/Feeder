@@ -476,4 +476,9 @@
     <string name="miniflux_cache_bootstrap">Checkpoint initialization</string>
     <string name="miniflux_cache_incremental">Incremental</string>
     <string name="miniflux_cache_delta_result">%1$s: fetched %2$d · inserted %3$d · updated %4$d · unchanged %5$d · deduplicated %6$d · pending protected %7$d · blobs updated %8$d · pages %9$d</string>
+    <string name="miniflux_deletion_check">Check remote deletion candidates (dry-run)</string>
+    <string name="miniflux_deletion_warning">Confirmation only. No changes made. Local articles and bodies are never deleted.</string>
+    <string name="miniflux_deletion_incomplete">Incomplete: %1$s. BASELINE_REQUIRED: complete the initial cache sync first. No candidates confirmed.</string>
+    <string name="miniflux_deletion_result">Remote Feed missing: %1$d\nMiniflux status removed (not physical deletion): %2$d\nConfirmed missing entries: %3$d\nUnverified (absence is not deletion): %4$d\nProtected by pending: %5$d\nStarred protection: %6$d\nEntries under missing Feeds: %7$d</string>
+    <string name="miniflux_deletion_limit">Showing first %1$d of %2$d Feed candidates and %3$d of %4$d Entry observations. Results are temporary observations, not a server snapshot. Protection flags reflect the start of this run.</string>
 </resources>
