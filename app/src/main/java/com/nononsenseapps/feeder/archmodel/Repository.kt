@@ -63,6 +63,8 @@ class Repository(
     override val di: DI,
 ) : DIAware {
     private val settingsStore: SettingsStore by instance()
+    private val backendModeStore: BackendModeStore by instance()
+    val backendSelection get() = backendModeStore.selection
     private val recentlyViewedStore: RecentlyViewedStore by instance()
     private val sessionStore: SessionStore by instance()
     private val feedItemStore: FeedItemStore by instance()

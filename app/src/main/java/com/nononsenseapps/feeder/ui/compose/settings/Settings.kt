@@ -264,7 +264,7 @@ fun SettingsScreen(
             forceSingleColumn = viewState.forceSingleColumn,
             onForceSingleColumnChange = settingsViewModel::setForceSingleColumn,
             modifier = Modifier.padding(padding),
-            minifluxSection = { MinifluxDiagnosticSection(settingsViewModel.miniflux, cacheController = settingsViewModel.minifluxCache) },
+            minifluxSection = { MinifluxDiagnosticSection(settingsViewModel.miniflux, cacheController = settingsViewModel.minifluxCache, backendController = settingsViewModel.backendMode) },
         )
     }
 }

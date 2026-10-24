@@ -23,6 +23,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nononsenseapps.feeder.R
+import com.nononsenseapps.feeder.miniflux.BackendModeController
 import com.nononsenseapps.feeder.miniflux.MinifluxCacheController
 import com.nononsenseapps.feeder.miniflux.MinifluxCacheSection
 import com.nononsenseapps.feeder.miniflux.MinifluxError
@@ -36,19 +37,24 @@ fun MinifluxDiagnosticSection(
     controller: MinifluxSettingsController,
     modifier: Modifier = Modifier,
     cacheController: MinifluxCacheController? = null,
+    backendController: BackendModeController? = null,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
-    val cacheBusy =
+    val backendState = backendController?.state?.collectAsStateWithLifecycle()?.value
+    val backendBusy = backendState?.busy == true || backendState?.confirmation != null
+    val cacheOperationBusy =
         cacheController
             ?.state
             ?.collectAsStateWithLifecycle()
             ?.value
             ?.busy == true
+    val cacheBusy = backendBusy || cacheOperationBusy
     var baseUrl by remember(state.baseUrl) { mutableStateOf(state.baseUrl) }
     // Never saveable, in SavedStateHandle, or restored from the credential store.
     var token by remember { mutableStateOf("") }
     SettingsGroup(title = R.string.miniflux_experimental, modifier = modifier) {
         Column(Modifier.width(LocalDimens.current.maxContentWidth).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            backendController?.let { BackendModeSection(it, baseUrl, enabled = !state.busy && !cacheOperationBusy) }
             Text(stringResource(R.string.miniflux_description))
             OutlinedTextField(
                 value = baseUrl,
@@ -92,7 +98,7 @@ fun MinifluxDiagnosticSection(
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 TextButton(onClick = controller::cancel) { Text(stringResource(android.R.string.cancel)) }
             }
-            cacheController?.let { MinifluxCacheSection(it, baseUrl, enabled = !state.busy) }
+            cacheController?.let { MinifluxCacheSection(it, baseUrl, enabled = !state.busy && !backendBusy) }
             state.error?.let { Text(stringResource(it.resource)) }
             state.result?.let { result ->
                 Text(stringResource(if (result.account is MinifluxStep.Success) R.string.miniflux_connected else R.string.miniflux_connection_failed))
@@ -145,7 +151,7 @@ private fun CapabilityText(
     Text("$label: $value")
 }
 
-private val MinifluxError.resource: Int
+internal val MinifluxError.resource: Int
     get() =
         when (this) {
             MinifluxError.MISSING_URL -> R.string.miniflux_missing_url

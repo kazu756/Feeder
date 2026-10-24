@@ -253,9 +253,10 @@ class MinifluxCacheStore(
         return completed
     }
 
-    suspend fun selectedProfile(): MinifluxProfile? =
+    suspend fun selectedProfile(existingOnly: Boolean = false): MinifluxProfile? =
         withContext(Dispatchers.IO) {
             val id = prefs.getString("profile", null) ?: return@withContext null
+            if (existingOnly && (!Regex("[a-f0-9]{64}").matches(id) || !context.getDatabasePath("miniflux_cache_$id.db").isFile)) return@withContext null
             database(id).cacheDao().profile()
         }
 

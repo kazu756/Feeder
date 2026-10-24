@@ -523,4 +523,25 @@
     <string name="miniflux_star_pending">★ Star sync pending</string>
     <string name="miniflux_star_disabled">Safe state-setting star writes could not be verified for this server build. Pending changes are retained. No bookmark toggle fallback is used.</string>
     <string name="miniflux_star_result">Star sync: targets %1$d · confirmed %2$d · failed %3$d · pending %4$d · skipped/deferred %5$d. At most 20 mutations per run.</string>
+    <string name="backend_title">Article source</string>
+    <string name="backend_current">Current setting: %1$s</string>
+    <string name="backend_local">FeederD (traditional)</string>
+    <string name="backend_miniflux">Miniflux (experimental)</string>
+    <string name="backend_local_description">FeederD fetches RSS feeds on this device.</string>
+    <string name="backend_foundation_note">This setting prepares Miniflux as the source of articles, read status and stars. Only the selection foundation is available now. The main screen and background RSS fetching still use the traditional method.</string>
+    <string name="backend_checking">Checking…</string>
+    <string name="backend_confirm_title">Change article source setting?</string>
+    <string name="backend_confirm_miniflux">After a read-only connection and cache check, save Miniflux as the article source setting. Existing RSS data, Miniflux cache and pending changes are retained. At this stage, the main screen and background RSS processing still use the traditional method.</string>
+    <string name="backend_confirm_local">Return the setting to FeederD. Miniflux cache and pending changes are retained.</string>
+    <string name="backend_use_miniflux">Switch to Miniflux</string>
+    <string name="backend_use_local">Return to FeederD</string>
+    <string name="backend_changed">Saved: %1$s</string>
+    <string name="backend_pending">Pending changes retained: read %1$d, star %2$d. Use manual Miniflux sync to send them.</string>
+    <string name="backend_profile_mismatch">The URL or account does not match the selected cache. Check the saved connection and sync Miniflux first.</string>
+    <string name="backend_baseline_required">Initial Miniflux cache sync is incomplete. Sync the Miniflux cache first.</string>
+    <string name="backend_cache_required">Sync the Miniflux cache first. A feed and cached article are required.</string>
+    <string name="backend_cache_unavailable">The Miniflux cache or article body is unavailable. Check and sync the cache first.</string>
+    <string name="backend_storage_error">Could not save the setting. The current mode was retained.</string>
+    <string name="backend_busy">Another source change is being checked.</string>
+    <string name="backend_cancelled">Cancelled. The current setting was retained.</string>
 </resources>

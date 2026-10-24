@@ -19,6 +19,7 @@ import com.nononsenseapps.feeder.archmodel.ThemeOptions
 import com.nononsenseapps.feeder.base.DIAwareViewModel
 import com.nononsenseapps.feeder.localtranslation.BergamotModelManager
 import com.nononsenseapps.feeder.localtranslation.LanguagePairInfo
+import com.nononsenseapps.feeder.miniflux.BackendModeController
 import com.nononsenseapps.feeder.miniflux.MinifluxCacheController
 import com.nononsenseapps.feeder.miniflux.MinifluxSettingsController
 import com.nononsenseapps.feeder.openai.OpenAIApi
@@ -62,6 +63,7 @@ class SettingsViewModel(
         )
 
     val miniflux = MinifluxSettingsController(context, di.direct.instance(), di.direct.instance(), viewModelScope)
+    val backendMode = BackendModeController(di.direct.instance(), di.direct.instance(), viewModelScope)
 
     fun setCurrentTheme(value: ThemeOptions) {
         repository.setCurrentTheme(value)

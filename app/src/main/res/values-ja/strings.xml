@@ -368,4 +368,25 @@
     <string name="miniflux_star_pending">★ スター同期待ち</string>
     <string name="miniflux_star_disabled">このserver buildでは安全なstar状態設定APIを確認できません。pendingを保持しています。bookmark toggleへは切り替えません。</string>
     <string name="miniflux_star_result">スター同期: 対象%1$d・確認成功%2$d・失敗%3$d・pending残%4$d・skip／次回%5$d。1回最大20 mutationです。</string>
+    <string name="backend_title">記事の取得元</string>
+    <string name="backend_current">現在の設定：%1$s</string>
+    <string name="backend_local">FeederD（従来方式）</string>
+    <string name="backend_miniflux">Miniflux（試験的）</string>
+    <string name="backend_local_description">FeederDは、この端末でRSSを取得します。</string>
+    <string name="backend_foundation_note">Minifluxを記事・既読・スター状態の基準として利用するための設定です。現在は切替基盤のみです。メイン画面とバックグラウンドRSS取得は、まだ従来方式です。</string>
+    <string name="backend_checking">確認中…</string>
+    <string name="backend_confirm_title">記事の取得元の設定を変更しますか？</string>
+    <string name="backend_confirm_miniflux">接続とキャッシュを読み取り専用で確認してから、Minifluxを記事取得元として使用する設定に切り替えます。通常RSSデータ・Minifluxキャッシュ・同期待ちは保持します。この段階ではメイン画面とRSSバックグラウンド処理も、まだ従来方式です。</string>
+    <string name="backend_confirm_local">FeederDの設定へ戻します。Minifluxキャッシュと同期待ちは保持します。</string>
+    <string name="backend_use_miniflux">Minifluxに切り替える</string>
+    <string name="backend_use_local">FeederDに戻す</string>
+    <string name="backend_changed">設定を保存しました：%1$s</string>
+    <string name="backend_pending">同期待ちを保持しています：既読 %1$d、スター %2$d。送信するには手動でMinifluxを同期してください。</string>
+    <string name="backend_profile_mismatch">URLまたはアカウントが、選択中のキャッシュと一致しません。接続設定を確認し、先にMinifluxを同期してください。</string>
+    <string name="backend_baseline_required">Minifluxの初回取得が完了していません。先にMinifluxキャッシュを同期してください。</string>
+    <string name="backend_cache_required">先にMinifluxキャッシュを同期してください。フィードと記事のキャッシュが必要です。</string>
+    <string name="backend_cache_unavailable">Minifluxキャッシュまたは記事本文を利用できません。確認してからキャッシュを同期してください。</string>
+    <string name="backend_storage_error">設定を保存できませんでした。現在のmodeを維持しています。</string>
+    <string name="backend_busy">別の記事取得元の切替を確認中です。</string>
+    <string name="backend_cancelled">キャンセルしました。現在の設定を維持しています。</string>
 </resources>

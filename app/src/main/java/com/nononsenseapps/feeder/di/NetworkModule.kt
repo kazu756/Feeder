@@ -1,6 +1,7 @@
 package com.nononsenseapps.feeder.di
 
 import android.app.Application
+import com.nononsenseapps.feeder.miniflux.BackendModeSwitchService
 import com.nononsenseapps.feeder.miniflux.MinifluxApiClient
 import com.nononsenseapps.feeder.miniflux.MinifluxCacheStore
 import com.nononsenseapps.feeder.miniflux.MinifluxCacheSync
@@ -29,6 +30,7 @@ import org.kodein.di.singleton
 val networkModule =
     DI.Module(name = "network") {
         bind<MinifluxCacheStore>() with singleton { MinifluxCacheStore(instance<Application>()) }
+        bind<BackendModeSwitchService>() with singleton { BackendModeSwitchService(instance(), instance(), instance(), instance()) }
         bind<MinifluxCacheSync>() with singleton { MinifluxCacheSync(instance(), instance()) }
         bind<MinifluxReadMutationStore>() with singleton { MinifluxReadMutationStore(instance()) }
         bind<MinifluxReadSync>() with singleton { MinifluxReadSync(instance(), instance(), instance()) }

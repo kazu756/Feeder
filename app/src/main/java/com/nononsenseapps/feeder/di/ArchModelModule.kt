@@ -1,6 +1,7 @@
 package com.nononsenseapps.feeder.di
 
 import android.app.Application
+import com.nononsenseapps.feeder.archmodel.BackendModeStore
 import com.nononsenseapps.feeder.archmodel.FeedItemStore
 import com.nononsenseapps.feeder.archmodel.FeedStore
 import com.nononsenseapps.feeder.archmodel.FontStore
@@ -50,6 +51,7 @@ val archModelModule =
         bind<Repository>() with singleton { Repository(di) }
         bind<SessionStore>() with singleton { SessionStore() }
         bind<SettingsStore>() with singleton { SettingsStore(di) }
+        bind<BackendModeStore>() with singleton { BackendModeStore(instance()) }
         bind<RecentlyViewedStore>() with singleton { RecentlyViewedStore(di) }
         bind<FeedStore>() with singleton { FeedStore(di) }
         bind<FontStore>() with singleton { FontStore(di) }
