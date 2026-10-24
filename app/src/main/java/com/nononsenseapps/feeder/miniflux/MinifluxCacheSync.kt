@@ -31,6 +31,15 @@ class MinifluxCacheSync(
 ) {
     private val mutex get() = store.operationMutex
 
+    internal suspend fun cleanupEntries(
+        plan: MinifluxEntryCleanupPlan,
+        token: String,
+        progress: (MinifluxCleanupResult) -> Unit,
+    ): MinifluxCleanupResult =
+        withTimeout(timeoutMillis) {
+            mutex.withLock { MinifluxEntryCleanup(api, store).run(plan, token, progress) }
+        }
+
     internal suspend fun cleanup(
         plan: MinifluxCleanupPlan,
         token: String,

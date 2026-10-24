@@ -29,9 +29,28 @@ fun MinifluxCacheSection(
     state.cleanupConfirmation?.let { confirmation ->
         AlertDialog(
             onDismissRequest = controller::dismissCleanup,
-            title = { Text(stringResource(R.string.miniflux_cleanup_title)) },
-            text = { Text(stringResource(R.string.miniflux_cleanup_confirm, confirmation.feeds, confirmation.entries, confirmation.blobs)) },
-            confirmButton = { TextButton(enabled = !state.busy && !preview, onClick = { controller.confirmCleanup(baseUrl) }) { Text(stringResource(R.string.miniflux_cleanup_delete)) } },
+            title = { Text(stringResource(if (confirmation.entryCleanup) R.string.miniflux_entry_cleanup_title else R.string.miniflux_cleanup_title)) },
+            text = {
+                Text(
+                    if (confirmation.entryCleanup) {
+                        stringResource(
+                            R.string.miniflux_entry_cleanup_confirm,
+                            confirmation.removed,
+                            confirmation.missing,
+                            confirmation.pendingExcluded,
+                            confirmation.starredExcluded,
+                            confirmation.blobs,
+                        )
+                    } else {
+                        stringResource(R.string.miniflux_cleanup_confirm, confirmation.feeds, confirmation.entries, confirmation.blobs)
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(enabled = !state.busy && !preview, onClick = { controller.confirmCleanup(baseUrl) }) {
+                    Text(stringResource(if (confirmation.entryCleanup) R.string.miniflux_entry_cleanup_delete else R.string.miniflux_cleanup_delete))
+                }
+            },
             dismissButton = { TextButton(onClick = controller::dismissCleanup) { Text(stringResource(android.R.string.cancel)) } },
         )
     }
@@ -50,6 +69,13 @@ fun MinifluxCacheSection(
             Text(stringResource(R.string.miniflux_deletion_check))
         }
         state.deletionResult?.let { result ->
+            val entryPlan = state.summary?.profile?.let { result.entryCleanupPlan(it) }
+            Button(enabled = enabled && !state.busy && !preview && entryPlan != null, onClick = { controller.requestEntryCleanup(baseUrl) }) {
+                Text(stringResource(R.string.miniflux_entry_cleanup_title))
+            }
+            if (entryPlan == null && result.complete) Text(stringResource(R.string.miniflux_entry_cleanup_none))
+            result.entryScanError?.let { Text(stringResource(R.string.miniflux_entry_scan_incomplete, it)) }
+            Text(stringResource(R.string.miniflux_entry_scan_limit, result.individualGets))
             val eligible = state.summary?.profile?.let { result.cleanupPlan(it) }
             if (eligible != null) {
                 Button(enabled = enabled && !state.busy && !preview, onClick = { controller.requestCleanup(baseUrl) }) {
@@ -71,7 +97,15 @@ fun MinifluxCacheSection(
                         result.feedEntries,
                     ),
                 )
-                Text(stringResource(R.string.miniflux_deletion_limit, result.feeds.size, result.missingFeeds, result.entries.size, result.removedEntries + result.feedEntries + result.unverified))
+                Text(
+                    stringResource(
+                        R.string.miniflux_deletion_limit,
+                        result.feeds.size,
+                        result.missingFeeds,
+                        result.entries.size,
+                        result.removedEntries + result.confirmedMissingEntries + result.feedEntries + result.unverified,
+                    ),
+                )
                 for (feed in result.feeds) {
                     Text(
                         "${feed.title} · Feed ${feed.remoteFeedId} / local ${feed.localFeedId}\n${feed.feedUrl}\n${feed.category}\n${feed.reason} · ${feed.confidence}\nEntries ${feed.entries} · Pending ${feed.pending} · Starred ${feed.starred} · Blobs ${feed.blobs}",
@@ -89,8 +123,19 @@ fun MinifluxCacheSection(
             Text(stringResource(R.string.miniflux_read_result, result.requested, result.confirmed, result.pending, result.failed))
         }
         state.cleanupResult?.let { result ->
+            if (state.entryCleanup) Text(stringResource(R.string.miniflux_entry_cleanup_title))
             Text(stringResource(if (result.complete) R.string.miniflux_cleanup_complete else R.string.miniflux_cleanup_incomplete))
-            Text(stringResource(R.string.miniflux_cleanup_result, result.feeds, result.entries, result.blobs, result.blobsFailed, result.skipped, result.failed))
+            Text(
+                stringResource(
+                    if (state.entryCleanup) R.string.miniflux_entry_cleanup_result else R.string.miniflux_cleanup_result,
+                    result.feeds,
+                    result.entries,
+                    result.blobs,
+                    result.blobsFailed,
+                    result.skipped,
+                    result.failed,
+                ),
+            )
             result.errorType?.let { Text(it) }
         }
         state.errorType?.let { Text(stringResource(R.string.miniflux_read_error, it)) }

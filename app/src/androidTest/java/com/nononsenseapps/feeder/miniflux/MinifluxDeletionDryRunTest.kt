@@ -146,7 +146,7 @@ class MinifluxDeletionDryRunTest {
         val result = sync.deletionDryRun(profile, "fixture-token")
         assertEquals(before, fingerprint(profile))
         assertTrue(requests.all { it.method == "GET" })
-        assertTrue(requests.none { it.path!!.contains("/ids") || it.path!!.matches(Regex("/v1/entries/\\d+")) })
+        assertTrue(requests.none { it.path!!.matches(Regex("/v1/entries/\\d+")) })
         assertEquals(
             3,
             store
@@ -297,7 +297,7 @@ class MinifluxDeletionDryRunTest {
             assertTrue(result.complete)
             assertEquals(0, result.unverified)
             assertEquals(102, result.pages)
-            assertEquals(105, requests.size)
+            assertEquals(106, requests.size)
             assertTrue(result.entries.isEmpty())
         }
 

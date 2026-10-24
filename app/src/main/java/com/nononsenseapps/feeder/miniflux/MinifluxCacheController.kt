@@ -31,12 +31,18 @@ data class MinifluxCacheState(
     val deletionResult: MinifluxDeletionResult? = null,
     val cleanupConfirmation: MinifluxCleanupConfirmation? = null,
     val cleanupResult: MinifluxCleanupResult? = null,
+    val entryCleanup: Boolean = false,
 )
 
 data class MinifluxCleanupConfirmation(
     val feeds: Int,
     val entries: Int,
     val blobs: Int,
+    val entryCleanup: Boolean = false,
+    val removed: Int = 0,
+    val missing: Int = 0,
+    val pendingExcluded: Int = 0,
+    val starredExcluded: Int = 0,
 )
 
 class MinifluxCacheController(
@@ -53,6 +59,36 @@ class MinifluxCacheController(
     private val active = AtomicBoolean(false)
     private var job: Job? = null
     private var cleanupPlan: MinifluxCleanupPlan? = null
+    private var entryCleanupPlan: MinifluxEntryCleanupPlan? = null
+
+    fun requestEntryCleanup(baseUrl: String) {
+        if (active.get()) return
+        val state = mutableState.value
+        val profile = state.summary?.profile ?: return
+        if (profile.baseUrl != runCatching { normalizedMinifluxUrl(baseUrl).toString() }.getOrNull()) return
+        val result = state.deletionResult ?: return
+        val plan = result.entryCleanupPlan(profile) ?: return
+        cleanupPlan = null
+        entryCleanupPlan = plan
+        val candidates = result.entries.filter { it.reason in setOf(MinifluxDeletionReason.REMOTE_STATUS_REMOVED, MinifluxDeletionReason.REMOTE_ENTRY_NOT_FOUND) && it.parentRemotePresent }
+        mutableState.update {
+            it.copy(
+                cleanupConfirmation =
+                    MinifluxCleanupConfirmation(
+                        0,
+                        plan.entries.size,
+                        plan.blobs,
+                        true,
+                        plan.removed,
+                        plan.missing,
+                        candidates.count {
+                            it.protectedByPending
+                        },
+                        candidates.count { it.protectedByStarred },
+                    ),
+            )
+        }
+    }
 
     fun requestCleanup(baseUrl: String) {
         if (active.get()) return
@@ -61,17 +97,21 @@ class MinifluxCacheController(
         if (profile.baseUrl != runCatching { normalizedMinifluxUrl(baseUrl).toString() }.getOrNull()) return
         val plan = state.deletionResult?.cleanupPlan(profile) ?: return
         cleanupPlan = plan
+        entryCleanupPlan = null
         mutableState.update { it.copy(cleanupConfirmation = MinifluxCleanupConfirmation(plan.feeds.size, plan.entries, plan.blobs)) }
     }
 
     fun dismissCleanup() {
         cleanupPlan = null
+        entryCleanupPlan = null
         mutableState.update { it.copy(cleanupConfirmation = null) }
     }
 
     fun confirmCleanup(baseUrl: String) {
-        val plan = cleanupPlan ?: return
-        if (plan.profile.baseUrl != runCatching { normalizedMinifluxUrl(baseUrl).toString() }.getOrNull()) {
+        val plan = cleanupPlan
+        val entryPlan = entryCleanupPlan
+        val profile = plan?.profile ?: entryPlan?.profile ?: return
+        if (profile.baseUrl != runCatching { normalizedMinifluxUrl(baseUrl).toString() }.getOrNull()) {
             dismissCleanup()
             return
         }
@@ -84,6 +124,7 @@ class MinifluxCacheController(
                 completed = false,
                 deletionResult = null,
                 cleanupResult = MinifluxCleanupResult(),
+                entryCleanup = entryPlan != null,
                 readResult = null,
                 cacheResult = null,
                 remaining = null,
@@ -97,11 +138,11 @@ class MinifluxCacheController(
                 .launch(Dispatchers.IO) {
                     try {
                         withTimeout(MINIFLUX_CACHE_TIMEOUT_MS + 5000) {
-                            val token = credentials.loadToken(plan.profile.baseUrl) ?: throw MinifluxFailure(MinifluxError.MISSING_TOKEN)
-                            val result =
-                                sync.cleanup(plan, token) { result ->
-                                    mutableState.update { it.copy(cleanupResult = result, count = result.feeds + result.skipped + result.failed) }
-                                }
+                            val token = credentials.loadToken(profile.baseUrl) ?: throw MinifluxFailure(MinifluxError.MISSING_TOKEN)
+                            val progress: (MinifluxCleanupResult) -> Unit = { result ->
+                                mutableState.update { it.copy(cleanupResult = result, count = result.entries + result.feeds + result.skipped + result.failed) }
+                            }
+                            val result = if (entryPlan != null) sync.cleanupEntries(entryPlan, token, progress) else sync.cleanup(checkNotNull(plan), token, progress)
                             mutableState.update { it.copy(cleanupResult = result) }
                         }
                     } catch (e: TimeoutCancellationException) {
@@ -186,6 +227,7 @@ class MinifluxCacheController(
                 cacheResult = null,
                 deletionResult = null,
                 cleanupResult = null,
+                entryCleanup = false,
                 errorType = null,
                 readStates = readStates,
                 stage = if (deletionDryRun) "dry-run" else "account",

@@ -21,6 +21,8 @@ data class MinifluxDeletionEntry(
     val protectedByPending: Boolean,
     val protectedByStarred: Boolean,
     val blobBytes: Long?,
+    val remoteFeedId: Long = 0,
+    val parentRemotePresent: Boolean = false,
 )
 
 data class MinifluxDeletionFeed(
@@ -51,6 +53,9 @@ data class MinifluxDeletionResult(
     val feeds: List<MinifluxDeletionFeed> = emptyList(),
     val entries: List<MinifluxDeletionEntry> = emptyList(),
     val profileId: String? = null,
+    val entryEnumerationComplete: Boolean = false,
+    val entryScanError: String? = null,
+    val individualGets: Int = 0,
 )
 
 /** Read-only observations, never an authorization to remove anything. No persistent result. */
@@ -89,6 +94,7 @@ internal class MinifluxDeletionDryRun(
             val remoteFeedIds = remoteFeeds.map { it.id }.toSet()
             val localIds = snapshot.entries.map { it.remoteEntryId }.toSet()
             val observed = mutableMapOf<Long, Pair<String, Boolean>>()
+            val allObserved = mutableSetOf<Long>()
             var cursor: Long? = null
             var pages = 0
             // Unfiltered listing works with legacy removed and newer physical-delete servers.
@@ -107,12 +113,41 @@ internal class MinifluxDeletionDryRun(
                     require(entry.id > 0 && entry.id < previous && entry.feedId > 0)
                     require(entry.status in setOf("read", "unread", "removed"))
                     previous = entry.id
+                    require(allObserved.add(entry.id))
                     if (entry.id in localIds) {
                         require(snapshot.entriesById.getValue(entry.id).remoteFeedId == entry.feedId)
                         observed[entry.id] = entry.status to entry.starred
                     }
                 }
                 cursor = page.entries.last().id
+            }
+            var enumerationComplete = false
+            var entryScanError: String? = null
+            var individualGets = 0
+            val confirmedMissing = mutableSetOf<Long>()
+            var knownIds: Set<Long> = allObserved
+            try {
+                val known = enumerateMinifluxIds(api, base, token) + allObserved
+                knownIds = known
+                enumerationComplete = true
+                val potential = snapshot.entries.filter { it.remoteFeedId in remoteFeedIds && it.remoteEntryId !in known }
+                for (identity in potential.take(MINIFLUX_ENTRY_CONFIRM_LIMIT)) {
+                    currentCoroutineContext().ensureActive()
+                    individualGets++
+                    val entry = api.deletionEntry(base, token, identity.remoteEntryId)
+                    if (entry == null) {
+                        confirmedMissing.add(identity.remoteEntryId)
+                    } else {
+                        require(entry.id == identity.remoteEntryId && entry.feedId == identity.remoteFeedId && entry.status in setOf("read", "unread", "removed"))
+                        observed[entry.id] = entry.status to entry.starred
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                confirmedMissing.clear()
+                enumerationComplete = false
+                entryScanError = (e as? MinifluxFailure)?.error?.name ?: "INVALID_RESPONSE"
             }
             // Recheck feeds: a changing inventory is incomplete, never a deletion proof.
             val endingFeeds = api.feeds(base, token)
@@ -147,23 +182,27 @@ internal class MinifluxDeletionDryRun(
             var pending = 0
             var starred = 0
             var feedEntries = 0
-            for (identity in snapshot.entries) {
+
+            fun reason(identity: MinifluxEntryIdentity): MinifluxDeletionReason? =
+                when {
+                    identity.remoteFeedId in missingIds -> MinifluxDeletionReason.REMOTE_FEED_MISSING
+                    observed[identity.remoteEntryId]?.first == "removed" -> MinifluxDeletionReason.REMOTE_STATUS_REMOVED
+                    identity.remoteEntryId in confirmedMissing -> MinifluxDeletionReason.REMOTE_ENTRY_NOT_FOUND
+                    observed[identity.remoteEntryId] == null && identity.remoteEntryId !in knownIds -> MinifluxDeletionReason.UNVERIFIED
+                    else -> null
+                }
+            for (identity in snapshot.entries.sortedBy { if (reason(it) in setOf(MinifluxDeletionReason.REMOTE_STATUS_REMOVED, MinifluxDeletionReason.REMOTE_ENTRY_NOT_FOUND)) 0 else 1 }) {
                 currentCoroutineContext().ensureActive()
                 val remote = observed[identity.remoteEntryId]
-                val reason =
-                    when {
-                        remote?.first == "removed" -> MinifluxDeletionReason.REMOTE_STATUS_REMOVED
-                        identity.remoteFeedId in missingIds -> MinifluxDeletionReason.REMOTE_FEED_MISSING
-                        remote == null -> MinifluxDeletionReason.UNVERIFIED
-                        else -> continue
-                    }
+                val reason = reason(identity) ?: continue
                 when (reason) {
                     MinifluxDeletionReason.REMOTE_STATUS_REMOVED -> removed++
                     MinifluxDeletionReason.REMOTE_FEED_MISSING -> feedEntries++
+                    MinifluxDeletionReason.REMOTE_ENTRY_NOT_FOUND -> Unit
                     else -> unknown++
                 }
                 val protectPending = identity.remoteEntryId in snapshot.pending
-                val protectStarred = identity.remoteStarred || remote?.second == true
+                val protectStarred = identity.remoteStarred || remote?.second == true || snapshot.items[identity.localFeedItemId]?.bookmarked == true
                 if (protectPending) pending++
                 if (protectStarred) starred++
                 if (details.size < 50) {
@@ -179,12 +218,15 @@ internal class MinifluxDeletionDryRun(
                             when (reason) {
                                 MinifluxDeletionReason.REMOTE_STATUS_REMOVED -> MinifluxDeletionConfidence.CONFIRMED
                                 MinifluxDeletionReason.REMOTE_FEED_MISSING -> MinifluxDeletionConfidence.HIGH
+                                MinifluxDeletionReason.REMOTE_ENTRY_NOT_FOUND -> MinifluxDeletionConfidence.CONFIRMED
                                 else -> MinifluxDeletionConfidence.UNKNOWN
                             },
                             remote?.first,
                             protectPending,
                             protectStarred,
                             bytes(identity),
+                            identity.remoteFeedId,
+                            identity.remoteFeedId in remoteFeedIds,
                         )
                 }
             }
@@ -193,6 +235,7 @@ internal class MinifluxDeletionDryRun(
                 true,
                 missingFeeds = missing.size,
                 removedEntries = removed,
+                confirmedMissingEntries = confirmedMissing.size,
                 unverified = unknown,
                 pending = pending,
                 starred = starred,
@@ -201,6 +244,9 @@ internal class MinifluxDeletionDryRun(
                 feeds = feedDetails,
                 entries = details,
                 profileId = profile.id,
+                entryEnumerationComplete = enumerationComplete,
+                entryScanError = entryScanError,
+                individualGets = individualGets,
             )
         } catch (e: CancellationException) {
             throw e

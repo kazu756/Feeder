@@ -46,6 +46,17 @@ data class MinifluxEntries(
 )
 
 @Serializable
+data class MinifluxEntryIds(
+    val total: Long,
+    @SerialName("entry_ids") val ids: List<Long>,
+)
+
+@Serializable
+internal data class MinifluxApiError(
+    @SerialName("error_message") val message: String,
+)
+
+@Serializable
 data class MinifluxVersion(
     val version: String,
 )

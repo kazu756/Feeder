@@ -72,6 +72,25 @@ class MinifluxApiClient internal constructor(
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    internal suspend fun deletionEntry(
+        base: HttpUrl,
+        token: String,
+        id: Long,
+    ): MinifluxEntry? {
+        require(id > 0)
+        return decode(get(base, token, "v1/entries/$id", verifiedNotFound = true))
+    }
+
+    internal suspend fun entryIds(
+        base: HttpUrl,
+        token: String,
+        status: String,
+        offset: Int,
+    ): MinifluxEntryIds {
+        require(status in setOf("read", "unread") && offset >= 0)
+        return decode(get(base, token, "v1/entries/ids", query = mapOf("status" to status, "offset" to offset.toString(), "limit" to "10000")))
+    }
+
     suspend fun entry(
         base: HttpUrl,
         token: String,
@@ -164,6 +183,7 @@ class MinifluxApiClient internal constructor(
         sample: Boolean = false,
         query: Map<String, String> = emptyMap(),
         readUpdate: String? = null,
+        verifiedNotFound: Boolean = false,
     ): String =
         withContext(Dispatchers.IO) {
             // Revalidate even for callers constructing an HttpUrl directly.
@@ -232,6 +252,17 @@ class MinifluxApiClient internal constructor(
                                                 in 500..599 -> MinifluxError.SERVER
                                                 else -> MinifluxError.HTTP
                                             }
+                                        if (verifiedNotFound && it.code == 404) {
+                                            check(path.matches(Regex("v1/entries/[1-9][0-9]*")) && readUpdate == null)
+                                            val source = it.body.source()
+                                            source.request(MAX_RESPONSE_BYTES + 1)
+                                            if (source.buffer.size > MAX_RESPONSE_BYTES) throw MinifluxFailure(MinifluxError.RESPONSE_TOO_LARGE)
+                                            val contentType = it.body.contentType()
+                                            if (contentType?.type != "application" || contentType.subtype != "json") throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
+                                            val message = decode<MinifluxApiError>(source.readUtf8())
+                                            if (message.message != "resource not found") throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
+                                            return@use Result.success("null")
+                                        }
                                         if (error != null) throw MinifluxFailure(error)
                                         val body = it.body
                                         val source = body.source()

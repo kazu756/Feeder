@@ -106,6 +106,16 @@ data class MinifluxReadOutbox(
 
 @Dao
 interface MinifluxCacheDao {
+    @Query("DELETE FROM miniflux_entry_identity WHERE profileId=:profile AND remoteEntryId=:remote AND localFeedItemId=:local")
+    suspend fun cleanupEntryIdentity(
+        profile: String,
+        remote: Long,
+        local: Long,
+    ): Int
+
+    @Query("DELETE FROM feed_items WHERE id=:local")
+    suspend fun cleanupItem(local: Long): Int
+
     @Query("SELECT * FROM miniflux_entry_identity WHERE profileId=:profile AND remoteFeedId=:feed")
     suspend fun cleanupEntries(
         profile: String,

@@ -477,7 +477,7 @@
     <string name="miniflux_cache_incremental">Incremental</string>
     <string name="miniflux_cache_delta_result">%1$s: fetched %2$d · inserted %3$d · updated %4$d · unchanged %5$d · deduplicated %6$d · pending protected %7$d · blobs updated %8$d · pages %9$d</string>
     <string name="miniflux_deletion_check">Check remote deletion candidates (dry-run)</string>
-    <string name="miniflux_deletion_warning">Confirmation only. No changes made. Local articles and bodies are never deleted.</string>
+    <string name="miniflux_deletion_warning">Dry-run checks only. It does not change or delete local articles or bodies.</string>
     <string name="miniflux_deletion_incomplete">Incomplete: %1$s. BASELINE_REQUIRED: complete the initial cache sync first. No candidates confirmed.</string>
     <string name="miniflux_deletion_result">Remote Feed missing: %1$d\nMiniflux status removed (not physical deletion): %2$d\nConfirmed missing entries: %3$d\nUnverified (absence is not deletion): %4$d\nProtected by pending: %5$d\nStarred protection: %6$d\nEntries under missing Feeds: %7$d</string>
     <string name="miniflux_deletion_limit">Showing first %1$d of %2$d Feed candidates and %3$d of %4$d Entry observations. Results are temporary observations, not a server snapshot. Protection flags reflect the start of this run.</string>
@@ -487,4 +487,11 @@
     <string name="miniflux_cleanup_complete">Cleanup finished. Run dry-run again to update candidates.</string>
     <string name="miniflux_cleanup_incomplete">Cleanup incomplete / in progress. Committed deletions remain applied.</string>
     <string name="miniflux_cleanup_result">Feeds removed locally: %1$d\nEntries removed locally: %2$d\nBlobs removed: %3$d\nBlobs failed / orphaned: %4$d\nSkipped: %5$d\nFailed Feeds: %6$d\nRemote Miniflux changes: 0</string>
+    <string name="miniflux_entry_cleanup_title">Clean local article cache</string>
+    <string name="miniflux_entry_cleanup_delete">Delete local article cache</string>
+    <string name="miniflux_entry_cleanup_confirm">Delete these reviewed articles from the local cache only?\nRemoved Entry: %1$d\nConfirmed missing Entry: %2$d\nPending excluded (displayed candidates): %3$d\nStarred excluded (displayed candidates): %4$d\nBody blobs: %5$d\nThe parent Feeds and Miniflux server are not changed. Each Entry is rechecked immediately before deletion.</string>
+    <string name="miniflux_entry_cleanup_none">No eligible article cleanup targets.</string>
+    <string name="miniflux_entry_scan_incomplete">Remote enumeration / confirmation incomplete (%1$s). Missing confirmation disabled; only independently verified removed observations may be available.</string>
+    <string name="miniflux_entry_scan_limit">Individual checks: %1$d / 50 maximum. Additional unverified articles require another scan; they are never cleanup targets.</string>
+    <string name="miniflux_entry_cleanup_result">Parent Feeds removed: %1$d\nEntries removed locally: %2$d\nBlobs removed: %3$d\nBlobs failed / orphaned: %4$d\nSkipped: %5$d\nFailed Entries: %6$d\nRemote Miniflux changes: 0</string>
 </resources>
