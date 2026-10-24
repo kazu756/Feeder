@@ -3,7 +3,6 @@ package com.nononsenseapps.feeder.miniflux
 import androidx.room.withTransaction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import java.time.Instant
@@ -118,7 +117,7 @@ class MinifluxReadSync(
     private val mutations: MinifluxReadMutationStore,
     private val manualTimeoutMillis: Long = 60_000,
 ) {
-    private val mutex = Mutex()
+    private val mutex get() = cache.operationMutex
 
     suspend fun sync(
         profile: MinifluxProfile,

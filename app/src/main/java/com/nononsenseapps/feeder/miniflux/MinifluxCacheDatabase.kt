@@ -106,6 +106,39 @@ data class MinifluxReadOutbox(
 
 @Dao
 interface MinifluxCacheDao {
+    @Query("SELECT * FROM miniflux_entry_identity WHERE profileId=:profile AND remoteFeedId=:feed")
+    suspend fun cleanupEntries(
+        profile: String,
+        feed: Long,
+    ): List<MinifluxEntryIdentity>
+
+    @Query("SELECT * FROM feed_items WHERE feed_id=:feed")
+    suspend fun cleanupItems(feed: Long): List<FeedItem>
+
+    @Query(
+        "SELECT COUNT(*) FROM miniflux_read_outbox o JOIN miniflux_entry_identity e ON e.profileId=o.profileId AND e.remoteEntryId=o.remoteEntryId WHERE e.profileId=:profile AND e.remoteFeedId=:feed",
+    )
+    suspend fun cleanupPendingCount(
+        profile: String,
+        feed: Long,
+    ): Int
+
+    @Query("DELETE FROM miniflux_entry_identity WHERE profileId=:profile AND remoteFeedId=:feed")
+    suspend fun cleanupEntryIdentities(
+        profile: String,
+        feed: Long,
+    )
+
+    @Query("DELETE FROM miniflux_feed_identity WHERE profileId=:profile AND remoteFeedId=:feed AND localFeedId=:local")
+    suspend fun cleanupFeedIdentity(
+        profile: String,
+        feed: Long,
+        local: Long,
+    ): Int
+
+    @Query("DELETE FROM feeds WHERE id=:local")
+    suspend fun cleanupFeed(local: Long): Int
+
     @Query("SELECT * FROM miniflux_feed_identity")
     suspend fun reconciliationFeeds(): List<MinifluxFeedIdentity>
 

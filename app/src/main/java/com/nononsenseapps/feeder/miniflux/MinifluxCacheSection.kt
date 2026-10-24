@@ -1,6 +1,7 @@
 package com.nononsenseapps.feeder.miniflux
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -25,6 +26,15 @@ fun MinifluxCacheSection(
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
     var preview by remember { mutableStateOf(false) }
+    state.cleanupConfirmation?.let { confirmation ->
+        AlertDialog(
+            onDismissRequest = controller::dismissCleanup,
+            title = { Text(stringResource(R.string.miniflux_cleanup_title)) },
+            text = { Text(stringResource(R.string.miniflux_cleanup_confirm, confirmation.feeds, confirmation.entries, confirmation.blobs)) },
+            confirmButton = { TextButton(enabled = !state.busy && !preview, onClick = { controller.confirmCleanup(baseUrl) }) { Text(stringResource(R.string.miniflux_cleanup_delete)) } },
+            dismissButton = { TextButton(onClick = controller::dismissCleanup) { Text(stringResource(android.R.string.cancel)) } },
+        )
+    }
     if (preview) state.summary?.let { MinifluxCachePreview(controller.store, it.profile, onClose = { preview = false }, mutations = controller.readMutations) }
     Column(modifier) {
         Text(stringResource(R.string.miniflux_cache_scope))
@@ -40,6 +50,12 @@ fun MinifluxCacheSection(
             Text(stringResource(R.string.miniflux_deletion_check))
         }
         state.deletionResult?.let { result ->
+            val eligible = state.summary?.profile?.let { result.cleanupPlan(it) }
+            if (eligible != null) {
+                Button(enabled = enabled && !state.busy && !preview, onClick = { controller.requestCleanup(baseUrl) }) {
+                    Text(stringResource(R.string.miniflux_cleanup_title))
+                }
+            }
             if (!result.complete) {
                 Text(stringResource(R.string.miniflux_deletion_incomplete, result.errorType ?: "UNKNOWN"))
             } else {
@@ -71,6 +87,11 @@ fun MinifluxCacheSection(
         }
         state.readResult?.let { result ->
             Text(stringResource(R.string.miniflux_read_result, result.requested, result.confirmed, result.pending, result.failed))
+        }
+        state.cleanupResult?.let { result ->
+            Text(stringResource(if (result.complete) R.string.miniflux_cleanup_complete else R.string.miniflux_cleanup_incomplete))
+            Text(stringResource(R.string.miniflux_cleanup_result, result.feeds, result.entries, result.blobs, result.blobsFailed, result.skipped, result.failed))
+            result.errorType?.let { Text(it) }
         }
         state.errorType?.let { Text(stringResource(R.string.miniflux_read_error, it)) }
         state.cacheResult?.let { result ->

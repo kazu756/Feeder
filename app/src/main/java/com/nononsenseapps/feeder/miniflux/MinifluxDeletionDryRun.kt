@@ -50,6 +50,7 @@ data class MinifluxDeletionResult(
     val pages: Int = 0,
     val feeds: List<MinifluxDeletionFeed> = emptyList(),
     val entries: List<MinifluxDeletionEntry> = emptyList(),
+    val profileId: String? = null,
 )
 
 /** Read-only observations, never an authorization to remove anything. No persistent result. */
@@ -199,6 +200,7 @@ internal class MinifluxDeletionDryRun(
                 pages = pages,
                 feeds = feedDetails,
                 entries = details,
+                profileId = profile.id,
             )
         } catch (e: CancellationException) {
             throw e

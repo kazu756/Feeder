@@ -481,4 +481,10 @@
     <string name="miniflux_deletion_incomplete">Incomplete: %1$s. BASELINE_REQUIRED: complete the initial cache sync first. No candidates confirmed.</string>
     <string name="miniflux_deletion_result">Remote Feed missing: %1$d\nMiniflux status removed (not physical deletion): %2$d\nConfirmed missing entries: %3$d\nUnverified (absence is not deletion): %4$d\nProtected by pending: %5$d\nStarred protection: %6$d\nEntries under missing Feeds: %7$d</string>
     <string name="miniflux_deletion_limit">Showing first %1$d of %2$d Feed candidates and %3$d of %4$d Entry observations. Results are temporary observations, not a server snapshot. Protection flags reflect the start of this run.</string>
+    <string name="miniflux_cleanup_title">Clean local cache</string>
+    <string name="miniflux_cleanup_delete">Delete local cache</string>
+    <string name="miniflux_cleanup_confirm">Delete these reviewed missing Feeds from the FeederD Miniflux local cache?\nFeeds: %1$d\nEntries: %2$d\nBody blobs: %3$d\nPending and starred Feeds are excluded. The Miniflux server is not changed. Remote absence and local protection are checked again. At most the first 50 reviewed Feed candidates are included.</string>
+    <string name="miniflux_cleanup_complete">Cleanup finished. Run dry-run again to update candidates.</string>
+    <string name="miniflux_cleanup_incomplete">Cleanup incomplete / in progress. Committed deletions remain applied.</string>
+    <string name="miniflux_cleanup_result">Feeds removed locally: %1$d\nEntries removed locally: %2$d\nBlobs removed: %3$d\nBlobs failed / orphaned: %4$d\nSkipped: %5$d\nFailed Feeds: %6$d\nRemote Miniflux changes: 0</string>
 </resources>

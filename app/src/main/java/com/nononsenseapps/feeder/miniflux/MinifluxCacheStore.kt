@@ -60,6 +60,7 @@ class MinifluxCacheStore(
     private val context: Context,
     preferencesName: String = "miniflux_cache_selection",
 ) {
+    internal val operationMutex = kotlinx.coroutines.sync.Mutex()
     private val databases = mutableMapOf<String, MinifluxCacheDatabase>()
     private val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
 

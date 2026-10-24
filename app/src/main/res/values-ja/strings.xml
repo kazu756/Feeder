@@ -326,4 +326,10 @@
     <string name="miniflux_deletion_incomplete">未完了: %1$s。BASELINE_REQUIREDの場合は初回cache同期を完了してください。候補は確定していません。</string>
     <string name="miniflux_deletion_result">Remote Feed missing: %1$d\nMinifluxでremoved状態（完全削除とは異なります）: %2$d\n不存在確認済みEntry: %3$d\n未確認（一覧にないだけでは削除と判定しません）: %4$d\npending保護対象: %5$d\nstarred保護対象: %6$d\nmissing Feed配下Entry: %7$d</string>
     <string name="miniflux_deletion_limit">Feed候補 %2$d件中先頭%1$d件、Entry観測 %4$d件中先頭%3$d件を表示。一時的な観測結果です。サーバーの同時点の状態は保証しません。保護フラグは開始時点の状態です。</string>
+    <string name="miniflux_cleanup_title">ローカルキャッシュを整理</string>
+    <string name="miniflux_cleanup_delete">ローカルキャッシュを削除</string>
+    <string name="miniflux_cleanup_confirm">確認したmissing FeedをFeederDのMinifluxローカルキャッシュから削除します。\nFeed: %1$d\n記事: %2$d\n本文blob: %3$d\npending・starredのあるFeedは除外されています。Minifluxサーバー側のデータは変更しません。実行直前にremote不在と保護条件を再確認します。表示済みの先頭50 Feed候補までが対象です。</string>
+    <string name="miniflux_cleanup_complete">整理処理が終了しました。候補を更新するには再度dry-runしてください。</string>
+    <string name="miniflux_cleanup_incomplete">整理は未完了／処理中です。確定済みのローカル削除は維持されます。</string>
+    <string name="miniflux_cleanup_result">ローカルFeed削除: %1$d\nローカル記事削除: %2$d\n本文blob削除: %3$d\n本文blob失敗／orphan: %4$d\nskip: %5$d\n失敗Feed: %6$d\nRemote Miniflux変更: 0</string>
 </resources>

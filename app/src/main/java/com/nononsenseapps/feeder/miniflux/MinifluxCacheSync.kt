@@ -2,7 +2,6 @@ package com.nononsenseapps.feeder.miniflux
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import java.time.Instant
@@ -30,7 +29,16 @@ class MinifluxCacheSync(
     private val store: MinifluxCacheStore,
     private val timeoutMillis: Long = MINIFLUX_CACHE_TIMEOUT_MS,
 ) {
-    private val mutex = Mutex()
+    private val mutex get() = store.operationMutex
+
+    internal suspend fun cleanup(
+        plan: MinifluxCleanupPlan,
+        token: String,
+        progress: (MinifluxCleanupResult) -> Unit,
+    ): MinifluxCleanupResult =
+        withTimeout(timeoutMillis) {
+            mutex.withLock { MinifluxFeedCleanup(api, store).run(plan, token, progress) }
+        }
 
     suspend fun deletionDryRun(
         profile: MinifluxProfile,
