@@ -84,7 +84,7 @@ internal class MinifluxDeletionDryRun(
                         },
                         dao.reconciliationEntries(),
                         dao.reconciliationItems().associateBy { it.id },
-                        dao.pending(profile.id).map { it.remoteEntryId }.toSet(),
+                        (dao.pending(profile.id).map { it.remoteEntryId } + dao.starPending(profile.id).map { it.remoteEntryId }).toSet(),
                     )
                 } ?: return MinifluxDeletionResult(false, "BASELINE_REQUIRED")
             val base = normalizedMinifluxUrl(profile.baseUrl)

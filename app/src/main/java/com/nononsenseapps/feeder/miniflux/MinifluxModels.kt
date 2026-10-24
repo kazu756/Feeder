@@ -58,7 +58,15 @@ internal data class MinifluxApiError(
 
 @Serializable
 data class MinifluxVersion(
-    val version: String,
+    val version: String = "",
+    val commit: String = "",
+    @SerialName("build_date") val buildDate: String = "",
+)
+
+@Serializable
+internal data class MinifluxStarUpdate(
+    @SerialName("entry_ids") val entryIds: List<Long>,
+    val starred: Boolean,
 )
 
 enum class MinifluxError {
@@ -141,6 +149,9 @@ data class MinifluxDiagnosticResult(
     val categories: MinifluxStep<Int> = MinifluxStep.NotChecked,
     val entries: MinifluxStep<Int> = MinifluxStep.NotChecked,
     val version: MinifluxStep<String> = MinifluxStep.NotChecked,
+    val buildInfo: MinifluxStep<MinifluxVersion> = MinifluxStep.NotChecked,
+    val starCapability: MinifluxStarCapability = minifluxStarCapability(null),
+    val entryIds: MinifluxStep<Int> = MinifluxStep.NotChecked,
 ) {
     val capabilities: MinifluxCapabilities
         get() = minifluxCapabilities((version as? MinifluxStep.Success)?.value)

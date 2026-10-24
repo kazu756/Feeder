@@ -32,6 +32,7 @@ data class MinifluxCacheState(
     val cleanupConfirmation: MinifluxCleanupConfirmation? = null,
     val cleanupResult: MinifluxCleanupResult? = null,
     val entryCleanup: Boolean = false,
+    val starResult: MinifluxStarSyncResult? = null,
 )
 
 data class MinifluxCleanupConfirmation(
@@ -53,6 +54,8 @@ class MinifluxCacheController(
     private val readSync: MinifluxReadSync,
     val readMutations: MinifluxReadMutationStore,
     private val manualTimeoutMillis: Long = 65_000,
+    val starMutations: MinifluxStarMutationStore = MinifluxStarMutationStore(store),
+    private val starSync: MinifluxStarSync? = null,
 ) {
     private val mutableState = MutableStateFlow(MinifluxCacheState())
     val state = mutableState.asStateFlow()
@@ -214,6 +217,7 @@ class MinifluxCacheController(
         baseUrl: String,
         readStates: Boolean = false,
         deletionDryRun: Boolean = false,
+        starStates: Boolean = false,
     ) {
         if (!active.compareAndSet(false, true)) return
         dismissCleanup()
@@ -224,6 +228,7 @@ class MinifluxCacheController(
                 completed = false,
                 remaining = null,
                 readResult = null,
+                starResult = null,
                 cacheResult = null,
                 deletionResult = null,
                 cleanupResult = null,
@@ -238,10 +243,15 @@ class MinifluxCacheController(
             scope
                 .launch(Dispatchers.IO) {
                     try {
-                        withTimeout(if (readStates) manualTimeoutMillis else MINIFLUX_CACHE_TIMEOUT_MS + 5000) {
+                        withTimeout(if (readStates || starStates) manualTimeoutMillis else MINIFLUX_CACHE_TIMEOUT_MS + 5000) {
                             val base = normalizedMinifluxUrl(baseUrl).toString()
                             val token = credentials.loadToken(base) ?: throw MinifluxFailure(MinifluxError.MISSING_TOKEN)
-                            if (deletionDryRun) {
+                            if (starStates) {
+                                val profile = store.selectedProfile() ?: throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
+                                if (profile.baseUrl != base) throw MinifluxFailure(MinifluxError.FORBIDDEN)
+                                val result = checkNotNull(starSync).sync(profile, token) { result -> mutableState.update { it.copy(starResult = result) } }
+                                mutableState.update { it.copy(starResult = result) }
+                            } else if (deletionDryRun) {
                                 val profile = store.selectedProfile() ?: throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
                                 if (profile.baseUrl != base) throw MinifluxFailure(MinifluxError.FORBIDDEN)
                                 val result = sync.deletionDryRun(profile, token)
@@ -270,7 +280,7 @@ class MinifluxCacheController(
                             if (deletionDryRun) it.copy(deletionResult = MinifluxDeletionResult(false, error)) else it.copy(failed = true, errorType = error)
                         }
                     } finally {
-                        if (!readStates && !deletionDryRun) {
+                        if (!readStates && !deletionDryRun && !starStates) {
                             // Partial cache remains available; it is never marked complete on failure/cancel.
                             try {
                                 withTimeout(2000) {

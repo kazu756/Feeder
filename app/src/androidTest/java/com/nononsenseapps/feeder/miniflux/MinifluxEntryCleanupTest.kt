@@ -334,7 +334,7 @@ class MinifluxEntryCleanupTest {
             rows = emptyList()
             assertEquals(0, dry(profile).removedEntries)
             assertEquals(
-                3,
+                4,
                 store
                     .database(profile.id)
                     .openHelper.readableDatabase.version,

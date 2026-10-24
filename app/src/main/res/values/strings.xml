@@ -451,7 +451,7 @@
   <string name="miniflux_redirect_error">Redirect refused. Enter the final server root URL.</string>
   <string name="miniflux_json_error">Invalid JSON or unexpected API response.</string>
   <string name="miniflux_response_large">Diagnostic response exceeded the size limit.</string>
-  <string name="miniflux_cache_scope">Initial cache: unread, starred and up to 1000 recent read entries. Later syncs fetch changed entries. Read-state sending is separate. Local RSS is unchanged.</string>
+  <string name="miniflux_cache_scope">Initial cache: unread, starred and up to 1000 recent read entries. Later syncs fetch changed entries. Read-state and star-state sending are separate manual operations. Local RSS is unchanged.</string>
   <string name="miniflux_cache_sync">Sync Miniflux cache (initial / incremental, GET only)</string>
   <string name="miniflux_cache_failed">Cache sync did not complete (%1$s, page %2$d). Existing cache is retained; retry manual sync.</string>
   <string name="miniflux_cache_complete">Cache sync completed. Miniflux read/star status has not been changed.</string>
@@ -459,7 +459,7 @@
   <string name="miniflux_cache_last">Last successful cache sync: %1$s</string>
   <string name="miniflux_cache_preview">View cached articles</string>
   <string name="miniflux_cache_back">Back</string>
-  <string name="miniflux_cache_read_only">Opening an article does not change its status. Explicit read/unread changes wait for manual sync. Star changes, history, translation, Summary and external media are disabled.</string>
+  <string name="miniflux_cache_read_only">Opening an article does not change its status. Explicit read/unread and star changes wait for their respective manual sync. History, translation, Summary and external media are disabled.</string>
   <string name="miniflux_cache_body_missing">Cached body is missing, incomplete or unreadable. Retry manual cache sync. RSS and original-content fetch are not used.</string>
   <string name="miniflux_cache_more">Load next 50 cached articles</string>
   <string name="miniflux_cache_loading">Loading cached body…</string>
@@ -494,4 +494,13 @@
     <string name="miniflux_entry_scan_incomplete">Remote enumeration / confirmation incomplete (%1$s). Missing confirmation disabled; only independently verified removed observations may be available.</string>
     <string name="miniflux_entry_scan_limit">Individual checks: %1$d / 50 maximum. Additional unverified articles require another scan; they are never cleanup targets.</string>
     <string name="miniflux_entry_cleanup_result">Parent Feeds removed: %1$d\nEntries removed locally: %2$d\nBlobs removed: %3$d\nBlobs failed / orphaned: %4$d\nSkipped: %5$d\nFailed Entries: %6$d\nRemote Miniflux changes: 0</string>
+    <string name="miniflux_star_sync">Sync starred state with Miniflux</string>
+    <string name="miniflux_build">Server build</string>
+    <string name="miniflux_star_capability">Star state-setting: %1$s · Reason: %2$s</string>
+    <string name="miniflux_ids_diagnostic">GET entries/ids (diagnostic only)</string>
+    <string name="miniflux_star">☆ Star</string>
+    <string name="miniflux_unstar">★ Unstar</string>
+    <string name="miniflux_star_pending">★ Star sync pending</string>
+    <string name="miniflux_star_disabled">Safe state-setting star writes could not be verified for this server build. Pending changes are retained. No bookmark toggle fallback is used.</string>
+    <string name="miniflux_star_result">Star sync: targets %1$d · confirmed %2$d · failed %3$d · pending %4$d · skipped/deferred %5$d. At most 20 mutations per run.</string>
 </resources>

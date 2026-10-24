@@ -190,7 +190,7 @@ class MinifluxCacheStoreTest {
             db.openHelper.readableDatabase
                 .query("PRAGMA foreign_key_check")
                 .use { assertEquals(0, it.count) }
-            assertEquals(3, db.openHelper.readableDatabase.version)
+            assertEquals(4, db.openHelper.readableDatabase.version)
             store.close()
             assertEquals(entry.content, store.readBody(profile.id, identity.localFeedItemId))
         }

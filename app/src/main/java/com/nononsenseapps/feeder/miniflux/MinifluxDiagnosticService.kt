@@ -17,22 +17,47 @@ class MinifluxDiagnosticService(
                 api.me(base, token).let { it.copy(username = safeDisplay(it.username, token)) }
             }
         if (account !is MinifluxStep.Success) return MinifluxDiagnosticResult(account)
-        return MinifluxDiagnosticResult(
-            account = account,
-            feeds = step { api.feeds(base, token).size },
-            categories = step { api.categories(base, token).size },
-            entries =
-                step {
-                    val entries = api.entries(base, token)
-                    if (entries.entries.size > 10 ||
-                        entries.total < entries.entries.size ||
-                        entries.entries.any { it.id <= 0 || it.feedId <= 0 || it.status !in setOf("read", "unread", "removed") }
-                    ) {
-                        throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
-                    }
-                    entries.entries.size
+        val result =
+            MinifluxDiagnosticResult(
+                account = account,
+                feeds = step { api.feeds(base, token).size },
+                categories = step { api.categories(base, token).size },
+                entries =
+                    step {
+                        val entries = api.entries(base, token)
+                        if (entries.entries.size > 10 ||
+                            entries.total < entries.entries.size ||
+                            entries.entries.any { it.id <= 0 || it.feedId <= 0 || it.status !in setOf("read", "unread", "removed") }
+                        ) {
+                            throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
+                        }
+                        entries.entries.size
+                    },
+            )
+        var capability = minifluxStarCapability(null)
+        val build =
+            step {
+                val raw = api.version(base, token)
+                // Evaluate original metadata; display sanitization must never enable a malformed version.
+                capability = minifluxStarCapability(raw)
+                raw.copy(version = safeDisplay(raw.version, token), commit = safeDisplay(raw.commit, token), buildDate = safeDisplay(raw.buildDate, token))
+            }
+        return result.copy(
+            version =
+                when (build) {
+                    is MinifluxStep.Success -> MinifluxStep.Success(build.value.version)
+                    is MinifluxStep.Failed -> build
+                    MinifluxStep.NotChecked -> MinifluxStep.NotChecked
                 },
-            version = step { safeDisplay(api.version(base, token).version, token) },
+            buildInfo = build,
+            starCapability = capability,
+            // Sibling endpoint availability is diagnostic only, never evidence for starred PUT.
+            entryIds =
+                step {
+                    val ids = api.entryIds(base, token, "unread", 0, limit = 1)
+                    if (ids.ids.size > 1 || ids.total < ids.ids.size || ids.ids.any { it <= 0 }) throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
+                    ids.ids.size
+                },
         )
     }
 

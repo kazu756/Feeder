@@ -52,6 +52,7 @@ fun MinifluxCachePreview(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     mutations: MinifluxReadMutationStore = MinifluxReadMutationStore(store),
+    starMutations: MinifluxStarMutationStore = MinifluxStarMutationStore(store),
 ) {
     var entries by remember(profile.id) { mutableStateOf<List<MinifluxCachedArticle>>(emptyList()) }
     var limit by remember(profile.id) { mutableIntStateOf(50) }
@@ -65,6 +66,19 @@ fun MinifluxCachePreview(
         scope.launch {
             try {
                 mutations.toggleStatus(profile.id, entry.identity.remoteEntryId)
+                mutationFailed = false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                mutationFailed = true
+            }
+        }
+    }
+
+    fun changeStar(entry: MinifluxCachedArticle) {
+        scope.launch {
+            try {
+                starMutations.toggleStarred(profile.id, entry.identity.remoteEntryId)
                 mutationFailed = false
             } catch (e: CancellationException) {
                 throw e
@@ -97,6 +111,7 @@ fun MinifluxCachePreview(
                 val article = entries.firstOrNull { it.identity.remoteEntryId == selected }
                 if (article != null) {
                     ReadStateControls(article, onChange = { change(article) })
+                    StarStateControls(article, onChange = { changeStar(article) })
                     MinifluxCachedReader(store, profile.id, article)
                 } else {
                     Text("${profile.baseUrl} · ${profile.username}", modifier = Modifier.padding(8.dp))
@@ -106,8 +121,9 @@ fun MinifluxCachePreview(
                             Column(Modifier.clickable { selected = entry.identity.remoteEntryId }.padding(12.dp)) {
                                 Text(entry.item.plainTitle, style = MaterialTheme.typography.titleMedium)
                                 Text("${entry.feed.title} · ${entry.feed.tag}")
-                                Text("${entry.item.pubDate ?: ""} · ${entry.effectiveStatus} · starred=${entry.identity.remoteStarred}")
+                                Text("${entry.item.pubDate ?: ""} · ${entry.effectiveStatus} · starred=${entry.effectiveStarred}")
                                 ReadStateControls(entry, onChange = { change(entry) })
+                                StarStateControls(entry, onChange = { changeStar(entry) })
                                 Spacer(Modifier.height(4.dp))
                             }
                         }
@@ -119,6 +135,20 @@ fun MinifluxCachePreview(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun StarStateControls(
+    article: MinifluxCachedArticle,
+    onChange: () -> Unit,
+) {
+    Column {
+        TextButton(onClick = onChange) { Text(stringResource(if (article.effectiveStarred) R.string.miniflux_unstar else R.string.miniflux_star)) }
+        article.starPending?.let { pending ->
+            Text(stringResource(R.string.miniflux_star_pending), style = MaterialTheme.typography.bodySmall)
+            pending.lastErrorType?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }

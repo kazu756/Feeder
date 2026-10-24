@@ -101,11 +101,13 @@ fun MinifluxDiagnosticSection(
                 StepText(stringResource(R.string.miniflux_categories), result.categories) { it.toString() }
                 StepText(stringResource(R.string.miniflux_entries), result.entries) { it.toString() }
                 StepText(stringResource(R.string.miniflux_version), result.version) { it }
+                StepText(stringResource(R.string.miniflux_build), result.buildInfo) { "commit=${it.commit.ifEmpty { "?" }} · build_date=${it.buildDate.ifEmpty { "?" }}" }
+                Text(stringResource(R.string.miniflux_star_capability, result.starCapability.support.name, result.starCapability.reason.name))
+                StepText(stringResource(R.string.miniflux_ids_diagnostic), result.entryIds) { it.toString() }
                 Text(stringResource(R.string.miniflux_capability_note))
                 val caps = result.capabilities
                 CapabilityText("changed_after", caps.changedAfter)
                 CapabilityText("read/unread", caps.readUnread)
-                CapabilityText("starred", caps.starredState)
                 CapabilityText("fetch-content", caps.originalContent)
             }
         }

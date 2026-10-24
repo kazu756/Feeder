@@ -68,6 +68,8 @@ class MinifluxApiClientTest {
     private fun fixtures(
         failedPath: String? = null,
         echo: Boolean = false,
+        serverVersion: String = "2.3.2",
+        serverCommit: String = "51f2e0d",
     ) {
         server.dispatcher =
             object : Dispatcher() {
@@ -91,7 +93,8 @@ class MinifluxApiClientTest {
 "url":"https://example.com/article",
 "content":"ignored"}]}
 """
-                            "/v1/version" -> """{"version":"2.3.2","commit":"ignored"}"""
+                            "/v1/version" -> """{"version":"$serverVersion","commit":"${if (echo) token else serverCommit}","build_date":"${if (echo) token else "2026-06-27"}"}"""
+                            "/v1/entries/ids" -> """{"total":12,"entry_ids":[4]}"""
                             else -> return MockResponse().setResponseCode(404)
                         }
                     return MockResponse().setBody(body)
@@ -99,7 +102,7 @@ class MinifluxApiClientTest {
             }
     }
 
-    @Test fun diagnosticUsesOnlyFiveGetRequestsAndParsesRemoteData() =
+    @Test fun diagnosticUsesOnlySixGetRequestsAndParsesRemoteBuildData() =
         runBlocking<Unit> {
             fixtures()
             val result = MinifluxDiagnosticService(api).run(server.url("/").toString(), token)
@@ -109,8 +112,11 @@ class MinifluxApiClientTest {
             assertEquals(MinifluxStep.Success(1), result.entries)
             assertEquals(MinifluxStep.Success("2.3.2"), result.version)
             assertEquals(MinifluxSupport.VERSION_EXPECTED, result.capabilities.starredState)
-            val requests = (1..5).map { server.takeRequest(2, TimeUnit.SECONDS)!! }
-            assertEquals(listOf("/v1/me", "/v1/feeds", "/v1/categories", "/v1/entries", "/v1/version"), requests.map { it.requestUrl!!.encodedPath })
+            assertEquals(MinifluxStep.Success(MinifluxVersion("2.3.2", "51f2e0d", "2026-06-27")), result.buildInfo)
+            assertEquals(MinifluxStarReason.SUPPORTED_SEMVER, result.starCapability.reason)
+            assertEquals(MinifluxStep.Success(1), result.entryIds)
+            val requests = (1..6).map { server.takeRequest(2, TimeUnit.SECONDS)!! }
+            assertEquals(listOf("/v1/me", "/v1/feeds", "/v1/categories", "/v1/entries", "/v1/version", "/v1/entries/ids"), requests.map { it.requestUrl!!.encodedPath })
             requests.forEach {
                 assertEquals("GET", it.method)
                 assertEquals(token, it.getHeader("X-Auth-Token"))
@@ -119,7 +125,8 @@ class MinifluxApiClientTest {
                 assertNull(it.getHeader("Authorization"))
             }
             assertEquals("10", requests[3].requestUrl!!.queryParameter("limit"))
-            assertEquals(5, server.requestCount)
+            assertEquals("1", requests[5].requestUrl!!.queryParameter("limit"))
+            assertEquals(6, server.requestCount)
         }
 
     @Test fun rejectsCrossOriginAndSameOriginRedirectsWithoutForwardingToken() =
@@ -135,6 +142,15 @@ class MinifluxApiClientTest {
                 assertNull(destination.takeRequest(200, TimeUnit.MILLISECONDS))
                 assertEquals(2, server.requestCount)
             }
+        }
+
+    @Test fun siblingIdsSuccessAndDateNeverEnableUnknownCustomBuild() =
+        runBlocking<Unit> {
+            fixtures(serverVersion = "2.3.x-dev", serverCommit = "unknown")
+            val result = MinifluxDiagnosticService(api).run(server.url("/").toString(), token)
+            assertEquals(MinifluxStep.Success(1), result.entryIds)
+            assertEquals(MinifluxStarSupport.UNKNOWN, result.starCapability.support)
+            repeat(6) { assertEquals("GET", server.takeRequest(2, TimeUnit.SECONDS)!!.method) }
         }
 
     @Test fun separatesHttpErrorsAndDiscardsSensitiveResponseBody() =
@@ -172,6 +188,7 @@ class MinifluxApiClientTest {
                 val steps = listOf(result.feeds, result.categories, result.entries, result.version)
                 assertEquals(1, steps.count { it is MinifluxStep.Failed })
                 assertEquals(3, steps.count { it is MinifluxStep.Success })
+                if (path == "/v1/version") assertEquals(MinifluxStarReason.UNKNOWN_VERSION_REQUEST_FAILED, result.starCapability.reason)
             }
         }
 

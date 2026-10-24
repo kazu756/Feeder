@@ -193,7 +193,7 @@ class MinifluxFeedCleanupTest {
             assertTrue(blobFile(other.localFeedItemId, store.articleDirectory(profile.id)).exists())
             assertEquals(0, dry(profile).missingFeeds)
             assertEquals(
-                3,
+                4,
                 store
                     .database(profile.id)
                     .openHelper.readableDatabase.version,

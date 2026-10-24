@@ -83,6 +83,7 @@ data class MinifluxEntryIdentity(
     val contentHash: String,
     val blobReady: Boolean = false,
     @ColumnInfo(defaultValue = "0") val readGeneration: Long = 0,
+    @ColumnInfo(defaultValue = "0") val starGeneration: Long = 0,
 )
 
 @Entity(
@@ -106,6 +107,27 @@ data class MinifluxReadOutbox(
 
 @Dao
 interface MinifluxCacheDao {
+    @Query("SELECT * FROM miniflux_star_outbox WHERE profileId=:profile ORDER BY updatedAt, remoteEntryId")
+    suspend fun starPending(profile: String): List<MinifluxStarOutbox>
+
+    @Query("SELECT * FROM miniflux_star_outbox WHERE profileId=:profile AND remoteEntryId=:remote")
+    suspend fun starPending(
+        profile: String,
+        remote: Long,
+    ): MinifluxStarOutbox?
+
+    @Query("SELECT * FROM miniflux_star_outbox")
+    fun observeStarPending(): Flow<List<MinifluxStarOutbox>>
+
+    @Upsert suspend fun saveStarPending(row: MinifluxStarOutbox)
+
+    @Query("DELETE FROM miniflux_star_outbox WHERE profileId=:profile AND remoteEntryId=:remote AND generation=:generation")
+    suspend fun acknowledgeStar(
+        profile: String,
+        remote: Long,
+        generation: Long,
+    ): Int
+
     @Query("DELETE FROM miniflux_entry_identity WHERE profileId=:profile AND remoteEntryId=:remote AND localFeedItemId=:local")
     suspend fun cleanupEntryIdentity(
         profile: String,
@@ -126,7 +148,7 @@ interface MinifluxCacheDao {
     suspend fun cleanupItems(feed: Long): List<FeedItem>
 
     @Query(
-        "SELECT COUNT(*) FROM miniflux_read_outbox o JOIN miniflux_entry_identity e ON e.profileId=o.profileId AND e.remoteEntryId=o.remoteEntryId WHERE e.profileId=:profile AND e.remoteFeedId=:feed",
+        "SELECT COUNT(*) FROM miniflux_entry_identity e WHERE e.profileId=:profile AND e.remoteFeedId=:feed AND (EXISTS (SELECT 1 FROM miniflux_read_outbox o WHERE e.profileId=o.profileId AND e.remoteEntryId=o.remoteEntryId) OR EXISTS (SELECT 1 FROM miniflux_star_outbox s WHERE e.profileId=s.profileId AND e.remoteEntryId=s.remoteEntryId))",
     )
     suspend fun cleanupPendingCount(
         profile: String,
@@ -284,14 +306,27 @@ data class MinifluxCachedChangeTime(
 
 /** Entirely separate from AppDatabase and its singleton/DAOs. One physical database per profile. */
 @Database(
-    entities = [Feed::class, FeedItem::class, MinifluxProfile::class, MinifluxCachedCategory::class, MinifluxFeedIdentity::class, MinifluxEntryIdentity::class, MinifluxReadOutbox::class],
-    version = 3,
+    entities = [
+        Feed::class, FeedItem::class, MinifluxProfile::class, MinifluxCachedCategory::class,
+        MinifluxFeedIdentity::class, MinifluxEntryIdentity::class, MinifluxReadOutbox::class, MinifluxStarOutbox::class,
+    ],
+    version = 4,
 )
 @TypeConverters(Converters::class)
 abstract class MinifluxCacheDatabase : RoomDatabase() {
     abstract fun cacheDao(): MinifluxCacheDao
 
     companion object {
+        val MIGRATION_3_4 =
+            object : Migration(3, 4) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE miniflux_entry_identity ADD COLUMN starGeneration INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS miniflux_star_outbox (profileId TEXT NOT NULL, remoteEntryId INTEGER NOT NULL, desiredStarred INTEGER NOT NULL, generation INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, lastAttemptAt INTEGER, attemptCount INTEGER NOT NULL, lastErrorType TEXT, lastErrorAt INTEGER, PRIMARY KEY(profileId, remoteEntryId), FOREIGN KEY(profileId, remoteEntryId) REFERENCES miniflux_entry_identity(profileId, remoteEntryId) ON UPDATE NO ACTION ON DELETE NO ACTION)",
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_miniflux_star_outbox_profileId_updatedAt ON miniflux_star_outbox (profileId, updatedAt)")
+                }
+            }
         val MIGRATION_2_3 =
             object : Migration(2, 3) {
                 override fun migrate(db: SupportSQLiteDatabase) {

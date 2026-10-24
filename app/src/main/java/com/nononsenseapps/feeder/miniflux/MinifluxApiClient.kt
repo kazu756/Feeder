@@ -54,7 +54,7 @@ fun validateMinifluxToken(token: String) {
     if (token.length > 4096 || token.any { it.code !in 33..126 }) throw MinifluxFailure(MinifluxError.INVALID_TOKEN)
 }
 
-/** Isolated client: diagnostics use GET; the only mutation is explicit read/unread status. */
+/** Isolated client: diagnostics use GET; mutations are explicit read/unread or desired starred state. */
 class MinifluxApiClient internal constructor(
     private val client: OkHttpClient,
 ) {
@@ -72,6 +72,16 @@ class MinifluxApiClient internal constructor(
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    internal suspend fun updateStarred(
+        base: HttpUrl,
+        token: String,
+        ids: List<Long>,
+        desired: Boolean,
+    ) {
+        require(ids.isNotEmpty() && ids.size <= 20 && ids.all { it > 0 } && ids.distinct().size == ids.size)
+        get(base, token, "v1/entries", entryUpdate = json.encodeToString(MinifluxStarUpdate(ids, desired)))
+    }
+
     internal suspend fun deletionEntry(
         base: HttpUrl,
         token: String,
@@ -86,9 +96,10 @@ class MinifluxApiClient internal constructor(
         token: String,
         status: String,
         offset: Int,
+        limit: Int = 10000,
     ): MinifluxEntryIds {
-        require(status in setOf("read", "unread") && offset >= 0)
-        return decode(get(base, token, "v1/entries/ids", query = mapOf("status" to status, "offset" to offset.toString(), "limit" to "10000")))
+        require(status in setOf("read", "unread") && offset >= 0 && limit in 1..10000)
+        return decode(get(base, token, "v1/entries/ids", query = mapOf("status" to status, "offset" to offset.toString(), "limit" to limit.toString())))
     }
 
     suspend fun entry(
@@ -108,7 +119,7 @@ class MinifluxApiClient internal constructor(
     ) {
         require(ids.isNotEmpty() && ids.size <= 50 && ids.all { it > 0 } && ids.distinct().size == ids.size)
         require(status in setOf("read", "unread"))
-        get(base, token, "v1/entries", readUpdate = json.encodeToString(MinifluxReadUpdate(ids, status)))
+        get(base, token, "v1/entries", entryUpdate = json.encodeToString(MinifluxReadUpdate(ids, status)))
     }
 
     suspend fun me(
@@ -182,7 +193,7 @@ class MinifluxApiClient internal constructor(
         path: String,
         sample: Boolean = false,
         query: Map<String, String> = emptyMap(),
-        readUpdate: String? = null,
+        entryUpdate: String? = null,
         verifiedNotFound: Boolean = false,
     ): String =
         withContext(Dispatchers.IO) {
@@ -209,11 +220,11 @@ class MinifluxApiClient internal constructor(
                         .header("X-Auth-Token", token)
                         .header("Accept", "application/json")
                         .apply {
-                            if (readUpdate == null) {
+                            if (entryUpdate == null) {
                                 get()
                             } else {
                                 check(path == "v1/entries" && !sample && query.isEmpty())
-                                put(readUpdate.toRequestBody("application/json".toMediaType()))
+                                put(entryUpdate.toRequestBody("application/json".toMediaType()))
                             }
                         }.build(),
                 )
@@ -253,7 +264,7 @@ class MinifluxApiClient internal constructor(
                                                 else -> MinifluxError.HTTP
                                             }
                                         if (verifiedNotFound && it.code == 404) {
-                                            check(path.matches(Regex("v1/entries/[1-9][0-9]*")) && readUpdate == null)
+                                            check(path.matches(Regex("v1/entries/[1-9][0-9]*")) && entryUpdate == null)
                                             val source = it.body.source()
                                             source.request(MAX_RESPONSE_BYTES + 1)
                                             if (source.buffer.size > MAX_RESPONSE_BYTES) throw MinifluxFailure(MinifluxError.RESPONSE_TOO_LARGE)

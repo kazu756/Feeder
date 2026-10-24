@@ -54,7 +54,17 @@ fun MinifluxCacheSection(
             dismissButton = { TextButton(onClick = controller::dismissCleanup) { Text(stringResource(android.R.string.cancel)) } },
         )
     }
-    if (preview) state.summary?.let { MinifluxCachePreview(controller.store, it.profile, onClose = { preview = false }, mutations = controller.readMutations) }
+    if (preview) {
+        state.summary?.let {
+            MinifluxCachePreview(
+                controller.store,
+                it.profile,
+                onClose = { preview = false },
+                mutations = controller.readMutations,
+                starMutations = controller.starMutations,
+            )
+        }
+    }
     Column(modifier) {
         Text(stringResource(R.string.miniflux_cache_scope))
         Button(enabled = enabled && !state.busy, onClick = { controller.syncCache(baseUrl) }) {
@@ -64,6 +74,14 @@ fun MinifluxCacheSection(
             Text(stringResource(R.string.miniflux_read_sync))
         }
         state.remaining?.let { Text(stringResource(R.string.miniflux_read_remaining, it)) }
+        Button(enabled = enabled && !state.busy && state.summary != null, onClick = { controller.syncCache(baseUrl, starStates = true) }) {
+            Text(stringResource(R.string.miniflux_star_sync))
+        }
+        state.starResult?.let { result ->
+            Text(stringResource(R.string.miniflux_star_capability, result.capability.support.name, result.capability.reason.name))
+            Text(stringResource(R.string.miniflux_star_result, result.requested, result.confirmed, result.failed, result.pending, result.skipped))
+            if (!result.writeEnabled) Text(stringResource(R.string.miniflux_star_disabled))
+        }
         Text(stringResource(R.string.miniflux_deletion_warning))
         Button(enabled = enabled && !state.busy && state.summary != null, onClick = { controller.syncCache(baseUrl, deletionDryRun = true) }) {
             Text(stringResource(R.string.miniflux_deletion_check))

@@ -296,7 +296,7 @@
   <string name="miniflux_redirect_error">redirectを拒否しました。転送先のサーバールートURLを入力してください。</string>
   <string name="miniflux_json_error">JSONまたはAPI応答形式が不正です。</string>
   <string name="miniflux_response_large">診断応答がサイズ上限を超えました。</string>
-  <string name="miniflux_cache_scope">初回は未読・starred・直近30日の既読（最大1000件）を取得し、以降は変更記事を取得します。既読状態の送信は別操作です。通常RSSは従来どおりです。</string>
+  <string name="miniflux_cache_scope">初回は未読・starred・直近30日の既読（最大1000件）を取得し、以降は変更記事を取得します。既読状態とstar状態は、それぞれ手動で送信します。通常RSSは従来どおりです。</string>
   <string name="miniflux_cache_sync">Minifluxキャッシュを同期（初回／差分・GETのみ）</string>
   <string name="miniflux_cache_failed">キャッシュ同期は未完了です（%1$s・page %2$d）。既存キャッシュは保持しています。手動で再試行してください。</string>
   <string name="miniflux_cache_complete">キャッシュ同期が完了しました。Minifluxの既読・star状態は変更していません。</string>
@@ -304,7 +304,7 @@
   <string name="miniflux_cache_last">最終キャッシュ同期成功：%1$s</string>
   <string name="miniflux_cache_preview">キャッシュ済み記事を確認</string>
   <string name="miniflux_cache_back">戻る</string>
-  <string name="miniflux_cache_read_only">記事を開くだけでは状態を変更しません。明示的な既読・未読操作は手動同期まで端末に保留します。star変更・履歴・翻訳・Summary・外部メディア読込は無効です。</string>
+  <string name="miniflux_cache_read_only">記事を開くだけでは状態を変更しません。明示的な既読・未読操作とstar操作は、それぞれの手動同期まで端末に保留します。履歴・翻訳・Summary・外部メディア読込は無効です。</string>
   <string name="miniflux_cache_body_missing">本文キャッシュが欠損・未完了・読込不能です。手動キャッシュ同期を再実行してください。RSS・独自全文取得にはfallbackしません。</string>
   <string name="miniflux_cache_more">次の50件を表示</string>
   <string name="miniflux_cache_loading">キャッシュ本文を読込中…</string>
@@ -339,4 +339,13 @@
     <string name="miniflux_entry_scan_incomplete">remote列挙／確認は不完全です（%1$s）。missing確定を無効にしました。独立して確認できたremoved観測だけが有効な場合があります。</string>
     <string name="miniflux_entry_scan_limit">個別確認: %1$d件／最大50件。上限を超える未確認記事は追加scanが必要で、cleanup対象にはしません。</string>
     <string name="miniflux_entry_cleanup_result">親Feed削除: %1$d\nローカル記事削除: %2$d\n本文blob削除: %3$d\n本文blob失敗／orphan: %4$d\nskip: %5$d\n失敗記事: %6$d\nRemote Miniflux変更: 0</string>
+    <string name="miniflux_star_sync">Minifluxとスター状態を同期</string>
+    <string name="miniflux_build">サーバーbuild</string>
+    <string name="miniflux_star_capability">Star状態設定: %1$s · 理由: %2$s</string>
+    <string name="miniflux_ids_diagnostic">GET entries/ids（診断のみ）</string>
+    <string name="miniflux_star">☆ スターを付ける</string>
+    <string name="miniflux_unstar">★ スターを外す</string>
+    <string name="miniflux_star_pending">★ スター同期待ち</string>
+    <string name="miniflux_star_disabled">このserver buildでは安全なstar状態設定APIを確認できません。pendingを保持しています。bookmark toggleへは切り替えません。</string>
+    <string name="miniflux_star_result">スター同期: 対象%1$d・確認成功%2$d・失敗%3$d・pending残%4$d・skip／次回%5$d。1回最大20 mutationです。</string>
 </resources>

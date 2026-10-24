@@ -130,7 +130,8 @@ internal class MinifluxEntryCleanup(
                                     dao.feed(feed.localFeedId) == null ||
                                     identity.remoteStarred ||
                                     item.bookmarked ||
-                                    dao.pending(profile.id, entry.remoteEntryId) != null
+                                    dao.pending(profile.id, entry.remoteEntryId) != null ||
+                                    dao.starPending(profile.id, entry.remoteEntryId) != null
                                 ) {
                                     return@withTransaction null
                                 }

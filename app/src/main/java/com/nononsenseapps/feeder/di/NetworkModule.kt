@@ -8,6 +8,8 @@ import com.nononsenseapps.feeder.miniflux.MinifluxCredentialStore
 import com.nononsenseapps.feeder.miniflux.MinifluxDiagnosticService
 import com.nononsenseapps.feeder.miniflux.MinifluxReadMutationStore
 import com.nononsenseapps.feeder.miniflux.MinifluxReadSync
+import com.nononsenseapps.feeder.miniflux.MinifluxStarMutationStore
+import com.nononsenseapps.feeder.miniflux.MinifluxStarSync
 import com.nononsenseapps.feeder.model.FeedParser
 import com.nononsenseapps.feeder.model.FullTextParser
 import com.nononsenseapps.feeder.model.RssLocalSync
@@ -29,6 +31,8 @@ val networkModule =
         bind<MinifluxCacheSync>() with singleton { MinifluxCacheSync(instance(), instance()) }
         bind<MinifluxReadMutationStore>() with singleton { MinifluxReadMutationStore(instance()) }
         bind<MinifluxReadSync>() with singleton { MinifluxReadSync(instance(), instance(), instance()) }
+        bind<MinifluxStarMutationStore>() with singleton { MinifluxStarMutationStore(instance()) }
+        bind<MinifluxStarSync>() with singleton { MinifluxStarSync(instance(), instance(), instance()) }
         bind<MinifluxApiClient>() with singleton { MinifluxApiClient() }
         bind<MinifluxCredentialStore>() with singleton { MinifluxCredentialStore(instance<Application>()) }
         bind<MinifluxDiagnosticService>() with singleton { MinifluxDiagnosticService(instance()) }

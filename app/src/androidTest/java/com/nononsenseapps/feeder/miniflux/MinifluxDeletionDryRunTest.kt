@@ -148,7 +148,7 @@ class MinifluxDeletionDryRunTest {
         assertTrue(requests.all { it.method == "GET" })
         assertTrue(requests.none { it.path!!.matches(Regex("/v1/entries/\\d+")) })
         assertEquals(
-            3,
+            4,
             store
                 .database(profile.id)
                 .openHelper.readableDatabase.version,

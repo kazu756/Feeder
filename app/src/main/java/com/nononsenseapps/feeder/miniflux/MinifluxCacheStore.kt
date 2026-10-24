@@ -51,8 +51,10 @@ data class MinifluxCachedArticle(
     val feed: Feed,
     val identity: MinifluxEntryIdentity,
     val pending: MinifluxReadOutbox? = null,
+    val starPending: MinifluxStarOutbox? = null,
 ) {
     val effectiveStatus: String get() = pending?.desiredStatus ?: identity.remoteStatus
+    val effectiveStarred: Boolean get() = starPending?.desiredStarred ?: identity.remoteStarred
 }
 
 /** No AppDatabase, Repository, notification, or scheduler reference is permitted here. */
@@ -70,7 +72,7 @@ class MinifluxCacheStore(
         return databases.getOrPut(profileId) {
             Room
                 .databaseBuilder(context, MinifluxCacheDatabase::class.java, "miniflux_cache_$profileId.db")
-                .addMigrations(MinifluxCacheDatabase.MIGRATION_1_2, MinifluxCacheDatabase.MIGRATION_2_3)
+                .addMigrations(MinifluxCacheDatabase.MIGRATION_1_2, MinifluxCacheDatabase.MIGRATION_2_3, MinifluxCacheDatabase.MIGRATION_3_4)
                 .build()
         }
     }
@@ -175,10 +177,11 @@ class MinifluxCacheStore(
                 item.feedId = feedIdentity.localFeedId
                 metadataChanged = priorItem != null && (priorItem.plainTitle != item.plainTitle || priorItem.link != item.link || priorItem.author != item.author || priorItem.pubDate != item.pubDate)
                 val pending = dao.pending(profile.id, entry.id)
-                pendingProtected = pending != null
+                val starPending = dao.starPending(profile.id, entry.id)
+                pendingProtected = pending != null || starPending != null
                 val effective = pending?.desiredStatus ?: entry.status
                 item.readTime = if (effective == "read") item.readTime ?: Instant.EPOCH else null
-                item.bookmarked = entry.starred
+                item.bookmarked = starPending?.desiredStarred ?: entry.starred
                 item.notified = true
                 if (item.id == 0L) item.id = dao.insertItem(item) else dao.updateItem(item)
                 MinifluxEntryIdentity(
@@ -193,6 +196,7 @@ class MinifluxCacheStore(
                     hash,
                     blobReady = !writeBody,
                     readGeneration = old?.readGeneration ?: 0,
+                    starGeneration = old?.starGeneration ?: 0,
                 ).also { dao.saveEntryIdentity(it) }
             }
         coroutineContext.ensureActive()
@@ -277,7 +281,13 @@ class MinifluxCacheStore(
             val dao = database(profileId).cacheDao()
             dao.entries(50, offset).map { identity ->
                 val item = dao.item(identity.localFeedItemId) ?: error("Missing item")
-                MinifluxCachedArticle(item, dao.feed(item.feedId ?: 0) ?: error("Missing feed"), identity, dao.pending(profileId, identity.remoteEntryId))
+                MinifluxCachedArticle(
+                    item,
+                    dao.feed(item.feedId ?: 0) ?: error("Missing feed"),
+                    identity,
+                    dao.pending(profileId, identity.remoteEntryId),
+                    dao.starPending(profileId, identity.remoteEntryId),
+                )
             }
         }
 
@@ -287,7 +297,7 @@ class MinifluxCacheStore(
     ): Flow<List<MinifluxCachedArticle>> {
         val db = database(profileId)
         val dao = db.cacheDao()
-        return combine(dao.observeEntries(limit), dao.observePending()) { _, _ ->
+        return combine(dao.observeEntries(limit), dao.observePending(), dao.observeStarPending()) { _, _, _ ->
             db.withTransaction {
                 val result = mutableListOf<MinifluxCachedArticle>()
                 var offset = 0

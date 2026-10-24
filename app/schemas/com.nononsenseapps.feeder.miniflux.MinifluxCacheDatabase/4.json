@@ -1,0 +1,902 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 4,
+    "identityHash": "a209553b2afcfdf35388ce268606812e",
+    "entities": [
+      {
+        "tableName": "feeds",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `custom_title` TEXT NOT NULL, `url` TEXT NOT NULL, `tag` TEXT NOT NULL, `notify` INTEGER NOT NULL, `image_url` TEXT, `last_sync` INTEGER NOT NULL, `response_hash` INTEGER NOT NULL, `fulltext_by_default` INTEGER NOT NULL, `open_articles_with` TEXT NOT NULL, `alternate_id` INTEGER NOT NULL, `currently_syncing` INTEGER NOT NULL, `when_modified` INTEGER NOT NULL, `site_fetched` INTEGER NOT NULL, `skip_duplicates` INTEGER NOT NULL, `retry_after` INTEGER NOT NULL, `summarize_on_open` INTEGER NOT NULL, `fetch_og_images` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "customTitle",
+            "columnName": "custom_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "url",
+            "columnName": "url",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tag",
+            "columnName": "tag",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notify",
+            "columnName": "notify",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "imageUrl",
+            "columnName": "image_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastSync",
+            "columnName": "last_sync",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "responseHash",
+            "columnName": "response_hash",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fullTextByDefault",
+            "columnName": "fulltext_by_default",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "openArticlesWith",
+            "columnName": "open_articles_with",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alternateId",
+            "columnName": "alternate_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currentlySyncing",
+            "columnName": "currently_syncing",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "whenModified",
+            "columnName": "when_modified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteFetched",
+            "columnName": "site_fetched",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "skipDuplicates",
+            "columnName": "skip_duplicates",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "retryAfter",
+            "columnName": "retry_after",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "summarizeOnOpen",
+            "columnName": "summarize_on_open",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fetchOgImages",
+            "columnName": "fetch_og_images",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_feeds_url",
+            "unique": true,
+            "columnNames": [
+              "url"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_feeds_url` ON `${TABLE_NAME}` (`url`)"
+          },
+          {
+            "name": "index_feeds_id_url_title",
+            "unique": true,
+            "columnNames": [
+              "id",
+              "url",
+              "title"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_feeds_id_url_title` ON `${TABLE_NAME}` (`id`, `url`, `title`)"
+          }
+        ]
+      },
+      {
+        "tableName": "feed_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `guid` TEXT NOT NULL, `title` TEXT NOT NULL, `plain_title` TEXT NOT NULL, `plain_snippet` TEXT NOT NULL, `image_url` TEXT, `image_from_body` INTEGER NOT NULL, `enclosure_link` TEXT, `enclosure_type` TEXT, `author` TEXT, `pub_date` TEXT, `link` TEXT, `unread` INTEGER NOT NULL, `notified` INTEGER NOT NULL, `feed_id` INTEGER, `first_synced_time` INTEGER NOT NULL, `primary_sort_time` INTEGER NOT NULL, `pinned` INTEGER NOT NULL, `bookmarked` INTEGER NOT NULL, `fulltext_downloaded` INTEGER NOT NULL, `read_time` INTEGER, `word_count` INTEGER NOT NULL, `word_count_full` INTEGER NOT NULL, `block_time` INTEGER, FOREIGN KEY(`feed_id`) REFERENCES `feeds`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "guid",
+            "columnName": "guid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "plainTitle",
+            "columnName": "plain_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "plainSnippet",
+            "columnName": "plain_snippet",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "thumbnailImage",
+            "columnName": "image_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "imageFromBody",
+            "columnName": "image_from_body",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enclosureLink",
+            "columnName": "enclosure_link",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "enclosureType",
+            "columnName": "enclosure_type",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "author",
+            "columnName": "author",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pubDate",
+            "columnName": "pub_date",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "link",
+            "columnName": "link",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "oldUnread",
+            "columnName": "unread",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notified",
+            "columnName": "notified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "feedId",
+            "columnName": "feed_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "firstSyncedTime",
+            "columnName": "first_synced_time",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "primarySortTime",
+            "columnName": "primary_sort_time",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "oldPinned",
+            "columnName": "pinned",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bookmarked",
+            "columnName": "bookmarked",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fullTextDownloaded",
+            "columnName": "fulltext_downloaded",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "readTime",
+            "columnName": "read_time",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "wordCount",
+            "columnName": "word_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wordCountFull",
+            "columnName": "word_count_full",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "blockTime",
+            "columnName": "block_time",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_feed_items_guid_feed_id",
+            "unique": true,
+            "columnNames": [
+              "guid",
+              "feed_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_feed_items_guid_feed_id` ON `${TABLE_NAME}` (`guid`, `feed_id`)"
+          },
+          {
+            "name": "index_feed_items_feed_id",
+            "unique": false,
+            "columnNames": [
+              "feed_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_feed_items_feed_id` ON `${TABLE_NAME}` (`feed_id`)"
+          },
+          {
+            "name": "index_feed_items_block_time",
+            "unique": false,
+            "columnNames": [
+              "block_time"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_feed_items_block_time` ON `${TABLE_NAME}` (`block_time`)"
+          },
+          {
+            "name": "idx_feed_items_cursor",
+            "unique": true,
+            "columnNames": [
+              "primary_sort_time",
+              "pub_date",
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `idx_feed_items_cursor` ON `${TABLE_NAME}` (`primary_sort_time`, `pub_date`, `id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "feeds",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "feed_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "miniflux_profiles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `baseUrl` TEXT NOT NULL, `userId` INTEGER NOT NULL, `username` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `lastSuccessfulSync` INTEGER, `changedCheckpoint` TEXT, `bootstrapChangedAt` TEXT DEFAULT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "baseUrl",
+            "columnName": "baseUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "username",
+            "columnName": "username",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSuccessfulSync",
+            "columnName": "lastSuccessfulSync",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "changedCheckpoint",
+            "columnName": "changedCheckpoint",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "bootstrapChangedAt",
+            "columnName": "bootstrapChangedAt",
+            "affinity": "TEXT",
+            "defaultValue": "NULL"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_miniflux_profiles_baseUrl_userId",
+            "unique": true,
+            "columnNames": [
+              "baseUrl",
+              "userId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_miniflux_profiles_baseUrl_userId` ON `${TABLE_NAME}` (`baseUrl`, `userId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "miniflux_categories",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` TEXT NOT NULL, `remoteId` INTEGER NOT NULL, `title` TEXT NOT NULL, PRIMARY KEY(`profileId`, `remoteId`), FOREIGN KEY(`profileId`) REFERENCES `miniflux_profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteId",
+            "columnName": "remoteId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "profileId",
+            "remoteId"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "miniflux_profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "miniflux_feed_identity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` TEXT NOT NULL, `remoteFeedId` INTEGER NOT NULL, `localFeedId` INTEGER NOT NULL, `remoteCategoryId` INTEGER NOT NULL, `siteUrl` TEXT NOT NULL, PRIMARY KEY(`profileId`, `remoteFeedId`), FOREIGN KEY(`profileId`) REFERENCES `miniflux_profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`localFeedId`) REFERENCES `feeds`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`profileId`, `remoteCategoryId`) REFERENCES `miniflux_categories`(`profileId`, `remoteId`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteFeedId",
+            "columnName": "remoteFeedId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localFeedId",
+            "columnName": "localFeedId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteCategoryId",
+            "columnName": "remoteCategoryId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteUrl",
+            "columnName": "siteUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "profileId",
+            "remoteFeedId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_miniflux_feed_identity_localFeedId",
+            "unique": true,
+            "columnNames": [
+              "localFeedId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_miniflux_feed_identity_localFeedId` ON `${TABLE_NAME}` (`localFeedId`)"
+          },
+          {
+            "name": "index_miniflux_feed_identity_profileId_remoteCategoryId",
+            "unique": false,
+            "columnNames": [
+              "profileId",
+              "remoteCategoryId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_miniflux_feed_identity_profileId_remoteCategoryId` ON `${TABLE_NAME}` (`profileId`, `remoteCategoryId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "miniflux_profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "feeds",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "localFeedId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "miniflux_categories",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId",
+              "remoteCategoryId"
+            ],
+            "referencedColumns": [
+              "profileId",
+              "remoteId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "miniflux_entry_identity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` TEXT NOT NULL, `remoteEntryId` INTEGER NOT NULL, `localFeedItemId` INTEGER NOT NULL, `remoteFeedId` INTEGER NOT NULL, `changedAt` TEXT, `remoteStatus` TEXT NOT NULL, `remoteStarred` INTEGER NOT NULL, `remoteCreatedAt` TEXT, `contentHash` TEXT NOT NULL, `blobReady` INTEGER NOT NULL, `readGeneration` INTEGER NOT NULL DEFAULT 0, `starGeneration` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`profileId`, `remoteEntryId`), FOREIGN KEY(`profileId`, `remoteFeedId`) REFERENCES `miniflux_feed_identity`(`profileId`, `remoteFeedId`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`localFeedItemId`) REFERENCES `feed_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteEntryId",
+            "columnName": "remoteEntryId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localFeedItemId",
+            "columnName": "localFeedItemId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteFeedId",
+            "columnName": "remoteFeedId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "changedAt",
+            "columnName": "changedAt",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "remoteStatus",
+            "columnName": "remoteStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteStarred",
+            "columnName": "remoteStarred",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteCreatedAt",
+            "columnName": "remoteCreatedAt",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "contentHash",
+            "columnName": "contentHash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "blobReady",
+            "columnName": "blobReady",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "readGeneration",
+            "columnName": "readGeneration",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "starGeneration",
+            "columnName": "starGeneration",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "profileId",
+            "remoteEntryId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_miniflux_entry_identity_localFeedItemId",
+            "unique": true,
+            "columnNames": [
+              "localFeedItemId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_miniflux_entry_identity_localFeedItemId` ON `${TABLE_NAME}` (`localFeedItemId`)"
+          },
+          {
+            "name": "index_miniflux_entry_identity_profileId_remoteFeedId",
+            "unique": false,
+            "columnNames": [
+              "profileId",
+              "remoteFeedId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_miniflux_entry_identity_profileId_remoteFeedId` ON `${TABLE_NAME}` (`profileId`, `remoteFeedId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "miniflux_feed_identity",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId",
+              "remoteFeedId"
+            ],
+            "referencedColumns": [
+              "profileId",
+              "remoteFeedId"
+            ]
+          },
+          {
+            "table": "feed_items",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "localFeedItemId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "miniflux_read_outbox",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` TEXT NOT NULL, `remoteEntryId` INTEGER NOT NULL, `desiredStatus` TEXT NOT NULL, `generation` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastAttemptAt` INTEGER, `attemptCount` INTEGER NOT NULL, `lastErrorType` TEXT, `lastErrorAt` INTEGER, PRIMARY KEY(`profileId`, `remoteEntryId`), FOREIGN KEY(`profileId`, `remoteEntryId`) REFERENCES `miniflux_entry_identity`(`profileId`, `remoteEntryId`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteEntryId",
+            "columnName": "remoteEntryId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "desiredStatus",
+            "columnName": "desiredStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "generation",
+            "columnName": "generation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastAttemptAt",
+            "columnName": "lastAttemptAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "attemptCount",
+            "columnName": "attemptCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastErrorType",
+            "columnName": "lastErrorType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastErrorAt",
+            "columnName": "lastErrorAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "profileId",
+            "remoteEntryId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_miniflux_read_outbox_profileId_updatedAt",
+            "unique": false,
+            "columnNames": [
+              "profileId",
+              "updatedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_miniflux_read_outbox_profileId_updatedAt` ON `${TABLE_NAME}` (`profileId`, `updatedAt`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "miniflux_entry_identity",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId",
+              "remoteEntryId"
+            ],
+            "referencedColumns": [
+              "profileId",
+              "remoteEntryId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "miniflux_star_outbox",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` TEXT NOT NULL, `remoteEntryId` INTEGER NOT NULL, `desiredStarred` INTEGER NOT NULL, `generation` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastAttemptAt` INTEGER, `attemptCount` INTEGER NOT NULL, `lastErrorType` TEXT, `lastErrorAt` INTEGER, PRIMARY KEY(`profileId`, `remoteEntryId`), FOREIGN KEY(`profileId`, `remoteEntryId`) REFERENCES `miniflux_entry_identity`(`profileId`, `remoteEntryId`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteEntryId",
+            "columnName": "remoteEntryId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "desiredStarred",
+            "columnName": "desiredStarred",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "generation",
+            "columnName": "generation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastAttemptAt",
+            "columnName": "lastAttemptAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "attemptCount",
+            "columnName": "attemptCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastErrorType",
+            "columnName": "lastErrorType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastErrorAt",
+            "columnName": "lastErrorAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "profileId",
+            "remoteEntryId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_miniflux_star_outbox_profileId_updatedAt",
+            "unique": false,
+            "columnNames": [
+              "profileId",
+              "updatedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_miniflux_star_outbox_profileId_updatedAt` ON `${TABLE_NAME}` (`profileId`, `updatedAt`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "miniflux_entry_identity",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId",
+              "remoteEntryId"
+            ],
+            "referencedColumns": [
+              "profileId",
+              "remoteEntryId"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a209553b2afcfdf35388ce268606812e')"
+    ]
+  }
+}
