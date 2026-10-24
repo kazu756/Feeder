@@ -10,6 +10,7 @@ import com.nononsenseapps.feeder.miniflux.MinifluxReadMutationStore
 import com.nononsenseapps.feeder.miniflux.MinifluxReadSync
 import com.nononsenseapps.feeder.miniflux.MinifluxStarMutationStore
 import com.nononsenseapps.feeder.miniflux.MinifluxStarSync
+import com.nononsenseapps.feeder.miniflux.MinifluxUnifiedSync
 import com.nononsenseapps.feeder.model.FeedParser
 import com.nononsenseapps.feeder.model.FullTextParser
 import com.nononsenseapps.feeder.model.RssLocalSync
@@ -33,6 +34,7 @@ val networkModule =
         bind<MinifluxReadSync>() with singleton { MinifluxReadSync(instance(), instance(), instance()) }
         bind<MinifluxStarMutationStore>() with singleton { MinifluxStarMutationStore(instance()) }
         bind<MinifluxStarSync>() with singleton { MinifluxStarSync(instance(), instance(), instance()) }
+        bind<MinifluxUnifiedSync>() with singleton { MinifluxUnifiedSync(instance(), instance(), instance(), instance(), instance()) }
         bind<MinifluxApiClient>() with singleton { MinifluxApiClient() }
         bind<MinifluxCredentialStore>() with singleton { MinifluxCredentialStore(instance<Application>()) }
         bind<MinifluxDiagnosticService>() with singleton { MinifluxDiagnosticService(instance()) }

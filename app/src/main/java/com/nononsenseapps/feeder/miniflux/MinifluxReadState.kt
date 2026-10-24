@@ -129,64 +129,77 @@ class MinifluxReadSync(
         token: String,
     ): MinifluxReadSyncResult =
         withTimeout(manualTimeoutMillis) {
-            mutex.withLock {
-                val base = normalizedMinifluxUrl(profile.baseUrl)
-                val dao = cache.database(profile.id).cacheDao()
-                val snapshots = dao.pending(profile.id)
-                var confirmed = 0
-                var failed = 0
-                if (snapshots.isEmpty()) return@withLock MinifluxReadSyncResult(0, 0, 0, 0)
-                // Never send an old profile's entry IDs using another account's token.
-                try {
-                    if (api.me(base, token).id != profile.userId) throw MinifluxFailure(MinifluxError.FORBIDDEN)
-                } catch (e: MinifluxFailure) {
-                    snapshots.forEach {
-                        mutations.attempt(it)
-                        mutations.failed(it, e.error.name)
-                    }
-                    throw e
+            mutex.withLock { syncLocked(profile, token, cache.database(profile.id).cacheDao().pending(profile.id)) }
+        }
+
+    /** Caller owns operationMutex. A supplied snapshot is never refreshed during this run. */
+    internal suspend fun syncLocked(
+        profile: MinifluxProfile,
+        token: String,
+        snapshots: List<MinifluxReadOutbox>,
+        progress: ((MinifluxReadSyncResult) -> Unit)? = null,
+        onError: (MinifluxError) -> Unit = {},
+    ): MinifluxReadSyncResult =
+        withTimeout(manualTimeoutMillis) {
+            val base = normalizedMinifluxUrl(profile.baseUrl)
+            val dao = cache.database(profile.id).cacheDao()
+            var confirmed = 0
+            var failed = 0
+            if (snapshots.isEmpty()) return@withTimeout MinifluxReadSyncResult(0, 0, 0, 0)
+            // Never send an old profile's entry IDs using another account's token.
+            try {
+                if (api.me(base, token).id != profile.userId) throw MinifluxFailure(MinifluxError.FORBIDDEN)
+            } catch (e: MinifluxFailure) {
+                onError(e.error)
+                snapshots.forEach {
+                    mutations.attempt(it)
+                    mutations.failed(it, e.error.name)
                 }
-                batches@ for ((status, rows) in snapshots.groupBy { it.desiredStatus }) {
-                    for (batch in rows.chunked(50)) {
-                        coroutineContext.ensureActive()
-                        batch.forEach { mutations.attempt(it) }
-                        val putError =
-                            try {
-                                api.updateReadStatus(base, token, batch.map { it.remoteEntryId }, status)
-                                null
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: MinifluxFailure) {
-                                e.error
-                            }
-                        for (row in batch) {
-                            if (putError != null && putError !in setOf(MinifluxError.CONNECTION, MinifluxError.DNS, MinifluxError.TIMEOUT)) {
-                                mutations.failed(row, putError.name)
-                                failed++
-                                continue
-                            }
-                            try {
-                                val remote = api.entry(base, token, row.remoteEntryId)
-                                if (remote.id != row.remoteEntryId) throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
-                                val ack = mutations.observeRemote(profile.id, remote, row)
-                                if (ack) confirmed++
-                                if (!ack && remote.status != row.desiredStatus) {
-                                    mutations.failed(row, putError?.name ?: "CONFIRMATION_MISMATCH")
-                                    failed++
-                                }
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: MinifluxFailure) {
-                                mutations.failed(row, e.error.name)
-                                failed++
-                            }
-                        }
-                        // Authentication errors stop this run without discarding any pending rows.
-                        if (putError in setOf(MinifluxError.UNAUTHORIZED, MinifluxError.FORBIDDEN)) break@batches
-                    }
-                }
-                // This button sends only its initial snapshot. Content/remote refresh is M2's GET button.
-                MinifluxReadSyncResult(snapshots.size, confirmed, dao.pending(profile.id).size, failed)
+                throw e
             }
+            batches@ for ((status, rows) in snapshots.groupBy { it.desiredStatus }) {
+                for (batch in rows.chunked(50)) {
+                    coroutineContext.ensureActive()
+                    batch.forEach { mutations.attempt(it) }
+                    val putError =
+                        try {
+                            api.updateReadStatus(base, token, batch.map { it.remoteEntryId }, status)
+                            null
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: MinifluxFailure) {
+                            onError(e.error)
+                            e.error
+                        }
+                    for (row in batch) {
+                        if (putError != null && putError !in setOf(MinifluxError.CONNECTION, MinifluxError.DNS, MinifluxError.TIMEOUT)) {
+                            mutations.failed(row, putError.name)
+                            failed++
+                            continue
+                        }
+                        try {
+                            val remote = api.entry(base, token, row.remoteEntryId)
+                            if (remote.id != row.remoteEntryId) throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
+                            val ack = mutations.observeRemote(profile.id, remote, row)
+                            if (ack) confirmed++
+                            if (!ack && remote.status != row.desiredStatus) {
+                                mutations.failed(row, putError?.name ?: "CONFIRMATION_MISMATCH")
+                                failed++
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: MinifluxFailure) {
+                            onError(e.error)
+                            mutations.failed(row, e.error.name)
+                            failed++
+                        }
+                        progress?.invoke(MinifluxReadSyncResult(snapshots.size, confirmed, dao.pending(profile.id).size, failed))
+                    }
+                    // Authentication errors stop this run without discarding any pending rows.
+                    if (putError in setOf(MinifluxError.UNAUTHORIZED, MinifluxError.FORBIDDEN)) break@batches
+                }
+            }
+            // This button sends only its initial snapshot. Content/remote refresh is M2's GET button.
+            MinifluxReadSyncResult(snapshots.size, confirmed, dao.pending(profile.id).size, failed)
         }
 }

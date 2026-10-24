@@ -94,12 +94,16 @@ class MinifluxApiClient internal constructor(
     internal suspend fun entryIds(
         base: HttpUrl,
         token: String,
-        status: String,
+        status: String?,
         offset: Int,
         limit: Int = 10000,
+        starred: Boolean? = null,
     ): MinifluxEntryIds {
-        require(status in setOf("read", "unread") && offset >= 0 && limit in 1..10000)
-        return decode(get(base, token, "v1/entries/ids", query = mapOf("status" to status, "offset" to offset.toString(), "limit" to limit.toString())))
+        require((status == null || status in setOf("read", "unread")) && offset >= 0 && limit in 1..10000)
+        val query = mutableMapOf("offset" to offset.toString(), "limit" to limit.toString())
+        status?.let { query["status"] = it }
+        starred?.let { query["starred"] = it.toString() }
+        return decode(get(base, token, "v1/entries/ids", query = query))
     }
 
     suspend fun entry(

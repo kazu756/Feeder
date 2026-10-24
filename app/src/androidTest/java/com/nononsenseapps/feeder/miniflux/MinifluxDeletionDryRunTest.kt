@@ -73,6 +73,8 @@ class MinifluxDeletionDryRunTest {
 
     @Volatile private var failure = ""
 
+    @Volatile private var modernIds = false
+
     init {
         server.dispatcher =
             object : Dispatcher() {
@@ -82,6 +84,39 @@ class MinifluxDeletionDryRunTest {
                     val url = request.requestUrl!!
                     if (failure == "auth") return MockResponse().setResponseCode(401)
                     return when (url.encodedPath) {
+                        "/v1/version" -> if (modernIds) MockResponse().setBody("""{"version":"2.3.x-dev","commit":"bdd8087d"}""") else MockResponse().setResponseCode(404)
+                        "/v1/entries/ids" -> {
+                            if (!modernIds) return MockResponse().setResponseCode(404)
+                            if (failure == "ids" && url.queryParameter("offset")!!.toInt() > 0) return MockResponse().setResponseCode(503)
+                            val ids =
+                                rows
+                                    .filter {
+                                        (
+                                            url.queryParameter(
+                                                "status",
+                                            ) == null ||
+                                                it.status == url.queryParameter("status")
+                                        ) &&
+                                            (url.queryParameter("starred") == null || it.starred)
+                                    }.map { it.id }
+                                    .sortedDescending()
+                            MockResponse().setBody(
+                                Json.encodeToString(
+                                    MinifluxEntryIds(
+                                        ids.size.toLong(),
+                                        ids.drop(url.queryParameter("offset")!!.toInt()).take(
+                                            if (failure ==
+                                                "ids"
+                                            ) {
+                                                3000
+                                            } else {
+                                                url.queryParameter("limit")!!.toInt()
+                                            },
+                                        ),
+                                    ),
+                                ),
+                            )
+                        }
                         "/v1/me" -> MockResponse().setBody("""{"id":42,"username":"fixture"}""")
                         "/v1/feeds" ->
                             when (failure) {
@@ -93,11 +128,11 @@ class MinifluxDeletionDryRunTest {
                         "/v1/entries" -> {
                             if (failure == "stall") return MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
                             val cursor = if (failure == "cursor") null else url.queryParameter("before_entry_id")?.toLong()
-                            if (failure == "page2" && cursor != null) return MockResponse().setResponseCode(503)
+                            if (failure == "page2" && cursor != null && cursor < 252) return MockResponse().setResponseCode(503)
                             val filtered = rows.filter { cursor == null || it.id < cursor }.sortedByDescending { it.id }
-                            MockResponse().setBody(Json.encodeToString(MinifluxEntries(filtered.size.toLong(), filtered.take(100))))
+                            MockResponse().setBody(Json.encodeToString(MinifluxEntries(filtered.size.toLong(), filtered.take(url.queryParameter("limit")!!.toInt()))))
                         }
-                        else -> MockResponse().setResponseCode(404)
+                        else -> MockResponse().setResponseCode(404).apply { if (modernIds) setHeader("Content-Type", "application/json").setBody("""{"error_message":"resource not found"}""") }
                     }
                 }
             }
@@ -237,12 +272,12 @@ class MinifluxDeletionDryRunTest {
 
     @Test fun paginationAndPageTwoFailure() =
         runBlocking {
-            val profile = prepare()
+            val profile = prepare(251)
             rows = (1L..251L).map { entry(it, "removed") }
             var result = runUnchanged(profile)
             assertTrue(result.complete)
-            assertEquals(4, result.pages)
-            assertEquals(1, result.removedEntries)
+            assertEquals(3, result.pages)
+            assertEquals(251, result.removedEntries)
             failure = "page2"
             result = runUnchanged(profile)
             assertFalse(result.complete)
@@ -296,9 +331,66 @@ class MinifluxDeletionDryRunTest {
             val result = runUnchanged(profile)
             assertTrue(result.complete)
             assertEquals(0, result.unverified)
-            assertEquals(102, result.pages)
-            assertEquals(106, requests.size)
+            assertEquals(60, result.pages)
+            assertEquals(65, requests.size)
             assertTrue(result.entries.isEmpty())
+        }
+
+    @Test fun requestBreakdownForSixThousandSevenHundredLocalEntries() =
+        runBlocking {
+            val profile = prepare()
+            val db = store.database(profile.id)
+            val dao = db.cacheDao()
+            val identity = dao.entryIdentity(profile.id, 1)!!
+            val item = dao.item(identity.localFeedItemId)!!
+            db.withTransaction {
+                for (id in 2L..6700L) {
+                    val local = dao.insertItem(item.copy(id = 0, guid = "fixture:$id"))
+                    dao.insertEntryIdentity(identity.copy(remoteEntryId = id, localFeedItemId = local, blobReady = false))
+                }
+            }
+            modernIds = true
+            rows = (1L..6700L).map { entry(it, if (it <= 6100) "read" else "unread") }
+            val events = mutableListOf<MinifluxReconciliationTrace>()
+            val result = MinifluxDeletionDryRun(api, store).run(profile, "fixture-token", events::add)
+            assertTrue(result.complete)
+            assertTrue(result.entryEnumerationComplete)
+            assertEquals(0, result.pages)
+            assertEquals(1, requests.count { it.requestUrl!!.queryParameter("status") == "read" })
+            assertEquals(1, requests.count { it.requestUrl!!.queryParameter("status") == "unread" })
+            assertEquals(1, requests.count { it.requestUrl!!.queryParameter("starred") == "true" })
+            assertTrue(requests.none { it.requestUrl!!.encodedPath == "/v1/entries" })
+            assertEquals(6100L, events.last().readIdsTotal)
+            assertEquals(600L, events.last().unreadIdsTotal)
+            assertEquals(0, result.individualGets)
+            assertTrue(requests.all { it.method == "GET" })
+            for (missing in listOf(2, 60)) {
+                requests.clear()
+                rows = rows.filter { it.id <= 6700 - missing }
+                val absent = MinifluxDeletionDryRun(api, store).run(profile, "fixture-token")
+                assertTrue(absent.complete)
+                assertEquals(minOf(50, missing), absent.individualGets)
+                assertEquals(minOf(50, missing), absent.confirmedMissingEntries)
+                assertEquals(maxOf(0, missing - 50), absent.unverified)
+                assertEquals(0, absent.pages)
+            }
+            rows = (1L..6700L).map { entry(it, if (it <= 6100) "read" else "unread", starred = it == 1L) }
+            remoteFeeds = emptyList()
+            MinifluxReadMutationStore(store).setStatus(profile.id, 3, "read")
+            MinifluxStarMutationStore(store).setStarred(profile.id, 2, true)
+            val protected = MinifluxDeletionDryRun(api, store).run(profile, "fixture-token")
+            assertEquals(1, protected.missingFeeds)
+            assertEquals(0, protected.individualGets)
+            assertTrue(protected.entries.first { it.remoteEntryId == 1L }.protectedByStarred)
+            assertTrue(protected.entries.first { it.remoteEntryId == 2L }.protectedByPending)
+            assertTrue(protected.entries.first { it.remoteEntryId == 3L }.protectedByPending)
+            failure = "ids"
+            requests.clear()
+            val failed = MinifluxDeletionDryRun(api, store).run(profile, "fixture-token")
+            assertFalse(failed.complete)
+            assertEquals("SERVER", failed.errorType)
+            assertEquals(0, failed.individualGets)
+            assertTrue(requests.none { it.requestUrl!!.encodedPath == "/v1/entries" })
         }
 
     @Test fun controllerReleasesBusyOnSuccessFailureTimeoutAndCancel() =

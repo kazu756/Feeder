@@ -123,7 +123,23 @@ class MinifluxStarStateTest {
                     return when (url.encodedPath) {
                         "/v1/me" -> MockResponse().setBody("""{"id":42,"username":"fixture"}""")
                         "/v1/version" -> MockResponse().setResponseCode(versionCode).setBody(Json.encodeToString(MinifluxVersion(versionText, commit, "2099-01-01")))
-                        "/v1/entries/ids" -> MockResponse().setBody(Json.encodeToString(MinifluxEntryIds(1, listOf(9000))))
+                        "/v1/entries/ids" -> {
+                            val ids =
+                                rows
+                                    .filter {
+                                        (
+                                            url.queryParameter(
+                                                "status",
+                                            ) == null ||
+                                                it.status == url.queryParameter("status")
+                                        ) &&
+                                            (url.queryParameter("starred") == null || it.starred)
+                                    }.map { it.id }
+                                    .sortedDescending()
+                            MockResponse().setBody(
+                                Json.encodeToString(MinifluxEntryIds(ids.size.toLong(), ids.drop(url.queryParameter("offset")!!.toInt()).take(url.queryParameter("limit")!!.toInt()))),
+                            )
+                        }
                         "/v1/feeds" -> MockResponse().setBody(Json.encodeToString(if (feedPresent) listOf(feed) else emptyList()))
                         "/v1/categories" -> MockResponse().setBody(Json.encodeToString(listOf(category)))
                         "/v1/entries" -> {

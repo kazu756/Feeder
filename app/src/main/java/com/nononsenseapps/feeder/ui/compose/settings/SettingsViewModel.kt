@@ -58,6 +58,7 @@ class SettingsViewModel(
             di.direct.instance(),
             starMutations = di.direct.instance(),
             starSync = di.direct.instance(),
+            unifiedSync = di.direct.instance(),
         )
 
     val miniflux = MinifluxSettingsController(context, di.direct.instance(), di.direct.instance(), viewModelScope)

@@ -110,9 +110,9 @@ class MinifluxEntryCleanupTest {
                         }
                         "/v1/entries" -> {
                             val cursor = url.queryParameter("before_entry_id")?.toLong()
-                            if (failure == "removed" && cursor != null) return MockResponse().setResponseCode(503)
+                            if (failure == "removed" && cursor != null && cursor < 252) return MockResponse().setResponseCode(503)
                             val filtered = rows.filter { cursor == null || it.id < cursor }.sortedByDescending { it.id }
-                            MockResponse().setBody(Json.encodeToString(MinifluxEntries(filtered.size.toLong(), filtered.take(100))))
+                            MockResponse().setBody(Json.encodeToString(MinifluxEntries(filtered.size.toLong(), filtered.take(url.queryParameter("limit")!!.toInt()))))
                         }
                         else -> {
                             val id = url.encodedPath.substringAfterLast('/').toLongOrNull() ?: return MockResponse().setResponseCode(404)
@@ -238,7 +238,7 @@ class MinifluxEntryCleanupTest {
             assertTrue(10001L in ids && 20002L in ids)
             for (status in listOf("read", "unread")) {
                 assertEquals(
-                    listOf("0", "10000", "10001"),
+                    listOf("0", "10000"),
                     requests
                         .filter {
                             it.requestUrl!!.queryParameter("status") == status
@@ -262,15 +262,15 @@ class MinifluxEntryCleanupTest {
 
     @Test fun unsupportedIdsUsesRemovedOnlyAndRemovedPagingFailureDiscardsPartial() =
         runBlocking<Unit> {
-            val profile = prepare(2)
+            val profile = prepare(251)
             rows = (1L..251L).map { entry(it, "removed") }
             failure = "unsupported"
             var result = dry(profile)
             assertTrue(result.complete)
-            assertEquals(2, result.removedEntries)
-            assertEquals(4, result.pages)
+            assertEquals(251, result.removedEntries)
+            assertEquals(3, result.pages)
             assertFalse(result.entryEnumerationComplete)
-            assertEquals(2, result.entryCleanupPlan(profile)!!.entries.size)
+            assertEquals(50, result.entryCleanupPlan(profile)!!.entries.size)
             failure = "removed"
             result = dry(profile)
             assertFalse(result.complete)

@@ -114,70 +114,81 @@ class MinifluxStarSync(
         progress: (MinifluxStarSyncResult) -> Unit = {},
     ): MinifluxStarSyncResult =
         withTimeout(timeoutMillis) {
-            cache.operationMutex.withLock {
-                val dao = cache.database(profile.id).cacheDao()
-                val initial = dao.starPending(profile.id)
-                val snapshots = initial.take(20)
-                val base = normalizedMinifluxUrl(profile.baseUrl)
-                if (api.me(base, token).id != profile.userId) throw MinifluxFailure(MinifluxError.FORBIDDEN)
-                val capability =
-                    try {
-                        minifluxStarCapability(api.version(base, token))
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (_: MinifluxFailure) {
-                        minifluxStarCapability(null)
-                    }
-                if (capability.support != MinifluxStarSupport.SUPPORTED) {
-                    return@withLock MinifluxStarSyncResult(0, 0, 0, initial.size, initial.size, false, capability).also(progress)
+            cache.operationMutex.withLock { syncLocked(profile, token, cache.database(profile.id).cacheDao().starPending(profile.id), progress) }
+        }
+
+    /** Caller owns operationMutex; no lock reacquisition and no pending snapshot refresh. */
+    internal suspend fun syncLocked(
+        profile: MinifluxProfile,
+        token: String,
+        initial: List<MinifluxStarOutbox>,
+        progress: (MinifluxStarSyncResult) -> Unit = {},
+        onError: (MinifluxError) -> Unit = {},
+    ): MinifluxStarSyncResult =
+        withTimeout(timeoutMillis) {
+            val dao = cache.database(profile.id).cacheDao()
+            val snapshots = initial.take(20)
+            val base = normalizedMinifluxUrl(profile.baseUrl)
+            if (api.me(base, token).id != profile.userId) throw MinifluxFailure(MinifluxError.FORBIDDEN)
+            val capability =
+                try {
+                    minifluxStarCapability(api.version(base, token))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: MinifluxFailure) {
+                    onError(e.error)
+                    minifluxStarCapability(null)
                 }
-                var confirmed = 0
-                var failed = 0
-                var processed = 0
-                for (snapshot in snapshots) {
-                    currentCoroutineContext().ensureActive()
-                    processed++
-                    try {
-                        val identity = checkNotNull(dao.entryIdentity(profile.id, snapshot.remoteEntryId))
-                        val before = api.entry(base, token, snapshot.remoteEntryId)
-                        if (before.id != snapshot.remoteEntryId ||
-                            before.feedId != identity.remoteFeedId ||
-                            before.status !in setOf("read", "unread")
-                        ) {
-                            throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
-                        }
-                        mutations.record(snapshot, null, attempt = true)
-                        val putError =
-                            try {
-                                api.updateStarred(base, token, listOf(snapshot.remoteEntryId), snapshot.desiredStarred)
-                                null
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: MinifluxFailure) {
-                                e.error
-                            }
-                        if (putError != null && putError !in setOf(MinifluxError.CONNECTION, MinifluxError.DNS, MinifluxError.TIMEOUT)) throw MinifluxFailure(putError)
-                        val remote = api.entry(base, token, snapshot.remoteEntryId)
-                        if (remote.id != snapshot.remoteEntryId) throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
-                        if (mutations.observeRemote(profile.id, remote, snapshot)) {
-                            confirmed++
-                        } else if (remote.starred != snapshot.desiredStarred) {
-                            failed++
-                            mutations.record(snapshot, "CONFIRMATION_MISMATCH")
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: MinifluxFailure) {
-                        failed++
-                        mutations.record(snapshot, e.error.name)
-                        if (e.error in setOf(MinifluxError.UNAUTHORIZED, MinifluxError.FORBIDDEN, MinifluxError.HTTP)) {
-                            progress(MinifluxStarSyncResult(snapshots.size, confirmed, failed, dao.starPending(profile.id).size, initial.size - processed, true, capability))
-                            break
-                        }
-                    }
-                    progress(MinifluxStarSyncResult(snapshots.size, confirmed, failed, dao.starPending(profile.id).size, initial.size - processed, true, capability))
-                }
-                MinifluxStarSyncResult(snapshots.size, confirmed, failed, dao.starPending(profile.id).size, initial.size - processed, true, capability)
+            if (capability.support != MinifluxStarSupport.SUPPORTED) {
+                return@withTimeout MinifluxStarSyncResult(0, 0, 0, dao.starPending(profile.id).size, initial.size, false, capability).also(progress)
             }
+            var confirmed = 0
+            var failed = 0
+            var processed = 0
+            for (snapshot in snapshots) {
+                currentCoroutineContext().ensureActive()
+                processed++
+                try {
+                    val identity = checkNotNull(dao.entryIdentity(profile.id, snapshot.remoteEntryId))
+                    val before = api.entry(base, token, snapshot.remoteEntryId)
+                    if (before.id != snapshot.remoteEntryId ||
+                        before.feedId != identity.remoteFeedId ||
+                        before.status !in setOf("read", "unread")
+                    ) {
+                        throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
+                    }
+                    mutations.record(snapshot, null, attempt = true)
+                    val putError =
+                        try {
+                            api.updateStarred(base, token, listOf(snapshot.remoteEntryId), snapshot.desiredStarred)
+                            null
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: MinifluxFailure) {
+                            e.error
+                        }
+                    if (putError != null && putError !in setOf(MinifluxError.CONNECTION, MinifluxError.DNS, MinifluxError.TIMEOUT)) throw MinifluxFailure(putError)
+                    val remote = api.entry(base, token, snapshot.remoteEntryId)
+                    if (remote.id != snapshot.remoteEntryId) throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
+                    if (mutations.observeRemote(profile.id, remote, snapshot)) {
+                        confirmed++
+                    } else if (remote.starred != snapshot.desiredStarred) {
+                        failed++
+                        mutations.record(snapshot, "CONFIRMATION_MISMATCH")
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: MinifluxFailure) {
+                    onError(e.error)
+                    failed++
+                    mutations.record(snapshot, e.error.name)
+                    if (e.error in setOf(MinifluxError.UNAUTHORIZED, MinifluxError.FORBIDDEN, MinifluxError.HTTP)) {
+                        progress(MinifluxStarSyncResult(snapshots.size, confirmed, failed, dao.starPending(profile.id).size, initial.size - processed, true, capability))
+                        break
+                    }
+                }
+                progress(MinifluxStarSyncResult(snapshots.size, confirmed, failed, dao.starPending(profile.id).size, initial.size - processed, true, capability))
+            }
+            MinifluxStarSyncResult(snapshots.size, confirmed, failed, dao.starPending(profile.id).size, initial.size - processed, true, capability)
         }
 }

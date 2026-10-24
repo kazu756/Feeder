@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nononsenseapps.feeder.BuildConfig
 import com.nononsenseapps.feeder.R
 import java.time.Instant
 
@@ -66,6 +67,11 @@ fun MinifluxCacheSection(
         }
     }
     Column(modifier) {
+        Button(enabled = enabled && !state.busy, onClick = { controller.syncAll(baseUrl) }) {
+            Text(stringResource(R.string.miniflux_unified_sync))
+        }
+        Text(stringResource(R.string.miniflux_unified_scope))
+        state.unifiedResult?.let { UnifiedResult(it) }
         Text(stringResource(R.string.miniflux_cache_scope))
         Button(enabled = enabled && !state.busy, onClick = { controller.syncCache(baseUrl) }) {
             Text(stringResource(R.string.miniflux_cache_sync))
@@ -183,7 +189,21 @@ fun MinifluxCacheSection(
         }
         if (state.busy) {
             LinearProgressIndicator()
-            Text("${state.stage}: ${state.count}")
+            if (state.unifiedResult != null) {
+                Text(
+                    stringResource(
+                        when (state.stage) {
+                            "read" -> R.string.miniflux_unified_stage_read
+                            "star" -> R.string.miniflux_unified_stage_star
+                            "cache" -> R.string.miniflux_unified_stage_cache
+                            "reconciliation" -> R.string.miniflux_unified_stage_deletion
+                            else -> R.string.miniflux_unified_stage_account
+                        },
+                    ),
+                )
+            } else {
+                Text("${state.stage}: ${state.count}")
+            }
             TextButton(onClick = controller::cancel) { Text(stringResource(android.R.string.cancel)) }
         }
         if (state.failed) Text(stringResource(R.string.miniflux_cache_failed, state.stage, state.count / 100 + 1))
@@ -196,3 +216,56 @@ fun MinifluxCacheSection(
         }
     }
 }
+
+@Composable
+private fun UnifiedResult(result: MinifluxUnifiedSyncResult) {
+    Column {
+        val overall =
+            when (result.overall) {
+                MinifluxUnifiedOverall.RUNNING -> R.string.miniflux_unified_running
+                MinifluxUnifiedOverall.SUCCESS -> R.string.miniflux_unified_success
+                MinifluxUnifiedOverall.PARTIAL_SUCCESS -> R.string.miniflux_unified_partial
+                MinifluxUnifiedOverall.NOTHING_TO_DO -> R.string.miniflux_unified_nothing
+                MinifluxUnifiedOverall.FAILED -> R.string.miniflux_unified_failed
+                MinifluxUnifiedOverall.CANCELLED -> R.string.miniflux_unified_cancelled
+            }
+        Text(stringResource(overall))
+        Text(stringResource(R.string.miniflux_unified_read, result.read.value?.requested ?: 0, result.read.value?.confirmed ?: 0, result.readPending) + " · " + unifiedStepText(result.read.state))
+        Text(stringResource(R.string.miniflux_unified_star, result.star.value?.requested ?: 0, result.star.value?.confirmed ?: 0, result.starPending) + " · " + unifiedStepText(result.star.state))
+        Text(
+            stringResource(R.string.miniflux_unified_cache, result.incremental.value?.fetched ?: 0, result.incremental.value?.inserted ?: 0, result.incremental.value?.updated ?: 0) + " · " +
+                unifiedStepText(result.incremental.state),
+        )
+        val deletion = result.reconciliation.value
+        Text(
+            stringResource(R.string.miniflux_unified_deletion, deletion?.missingFeeds ?: 0, (deletion?.removedEntries ?: 0) + (deletion?.confirmedMissingEntries ?: 0)) + " · " +
+                unifiedStepText(result.reconciliation.state),
+        )
+        if (deletion?.feeds?.isNotEmpty() == true || deletion?.entries?.isNotEmpty() == true) Text(stringResource(R.string.miniflux_unified_candidates))
+        val errors = listOfNotNull(result.errorType, result.read.errorType, result.star.errorType, result.incremental.errorType, result.reconciliation.errorType).distinct()
+        if (errors.isNotEmpty()) Text(errors.joinToString(" · "))
+        if (BuildConfig.DEBUG) {
+            result.timeoutSource?.let { Text("Timeout source: $it") }
+            result.reconciliationTrace?.let {
+                Text("Reconciliation: ${it.phase} · ${it.elapsedMillis} ms · requests ${it.requestsStarted} · pages ${it.pages} · last ${it.lastRequestPhase ?: "—"}")
+                Text(
+                    "${it.mode} · read IDs ${it.readIdsTotal ?: "—"}/${it.readIdsPages} pages · unread IDs ${it.unreadIdsTotal ?: "—"}/${it.unreadIdsPages} pages · individual GET ${it.individualGets}",
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun unifiedStepText(state: MinifluxUnifiedStepState): String =
+    stringResource(
+        when (state) {
+            MinifluxUnifiedStepState.NOT_RUN -> R.string.miniflux_unified_not_run
+            MinifluxUnifiedStepState.RUNNING -> R.string.miniflux_unified_running
+            MinifluxUnifiedStepState.SUCCESS -> R.string.miniflux_unified_success
+            MinifluxUnifiedStepState.PARTIAL -> R.string.miniflux_unified_partial
+            MinifluxUnifiedStepState.SKIPPED -> R.string.miniflux_unified_skipped
+            MinifluxUnifiedStepState.FAILED -> R.string.miniflux_unified_failed
+            MinifluxUnifiedStepState.CANCELLED -> R.string.miniflux_unified_cancelled
+        },
+    )

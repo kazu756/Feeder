@@ -33,6 +33,7 @@ data class MinifluxCacheState(
     val cleanupResult: MinifluxCleanupResult? = null,
     val entryCleanup: Boolean = false,
     val starResult: MinifluxStarSyncResult? = null,
+    val unifiedResult: MinifluxUnifiedSyncResult? = null,
 )
 
 data class MinifluxCleanupConfirmation(
@@ -56,6 +57,7 @@ class MinifluxCacheController(
     private val manualTimeoutMillis: Long = 65_000,
     val starMutations: MinifluxStarMutationStore = MinifluxStarMutationStore(store),
     private val starSync: MinifluxStarSync? = null,
+    private val unifiedSync: MinifluxUnifiedSync? = null,
 ) {
     private val mutableState = MutableStateFlow(MinifluxCacheState())
     val state = mutableState.asStateFlow()
@@ -213,11 +215,14 @@ class MinifluxCacheController(
         }
     }
 
+    fun syncAll(baseUrl: String) = syncCache(baseUrl, unified = true)
+
     fun syncCache(
         baseUrl: String,
         readStates: Boolean = false,
         deletionDryRun: Boolean = false,
         starStates: Boolean = false,
+        unified: Boolean = false,
     ) {
         if (!active.compareAndSet(false, true)) return
         dismissCleanup()
@@ -229,6 +234,7 @@ class MinifluxCacheController(
                 remaining = null,
                 readResult = null,
                 starResult = null,
+                unifiedResult = if (unified) MinifluxUnifiedSyncResult() else null,
                 cacheResult = null,
                 deletionResult = null,
                 cleanupResult = null,
@@ -243,10 +249,24 @@ class MinifluxCacheController(
             scope
                 .launch(Dispatchers.IO) {
                     try {
-                        withTimeout(if (readStates || starStates) manualTimeoutMillis else MINIFLUX_CACHE_TIMEOUT_MS + 5000) {
+                        withTimeout(
+                            if (unified) {
+                                125_000
+                            } else if (readStates || starStates) {
+                                manualTimeoutMillis
+                            } else {
+                                MINIFLUX_CACHE_TIMEOUT_MS + 5000
+                            },
+                        ) {
                             val base = normalizedMinifluxUrl(baseUrl).toString()
                             val token = credentials.loadToken(base) ?: throw MinifluxFailure(MinifluxError.MISSING_TOKEN)
-                            if (starStates) {
+                            if (unified) {
+                                checkNotNull(unifiedSync).sync(base, token) { result ->
+                                    mutableState.update {
+                                        it.copy(unifiedResult = result, stage = result.stage, summary = result.summary ?: it.summary, deletionResult = result.reconciliation.value)
+                                    }
+                                }
+                            } else if (starStates) {
                                 val profile = store.selectedProfile() ?: throw MinifluxFailure(MinifluxError.INVALID_RESPONSE)
                                 if (profile.baseUrl != base) throw MinifluxFailure(MinifluxError.FORBIDDEN)
                                 val result = checkNotNull(starSync).sync(profile, token) { result -> mutableState.update { it.copy(starResult = result) } }
@@ -270,17 +290,29 @@ class MinifluxCacheController(
                     } catch (e: TimeoutCancellationException) {
                         currentCoroutineContext().ensureActive()
                         mutableState.update {
-                            if (deletionDryRun) it.copy(deletionResult = MinifluxDeletionResult(false, "TIMEOUT")) else it.copy(failed = true, errorType = "TIMEOUT")
+                            if (unified) {
+                                it.copy(unifiedResult = (it.unifiedResult ?: MinifluxUnifiedSyncResult()).interrupted("TIMEOUT"))
+                            } else if (deletionDryRun) {
+                                it.copy(deletionResult = MinifluxDeletionResult(false, "TIMEOUT"))
+                            } else {
+                                it.copy(failed = true, errorType = "TIMEOUT")
+                            }
                         }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
                         val error = (e as? MinifluxFailure)?.error?.name ?: "LOCAL_ERROR"
                         mutableState.update {
-                            if (deletionDryRun) it.copy(deletionResult = MinifluxDeletionResult(false, error)) else it.copy(failed = true, errorType = error)
+                            if (unified) {
+                                it.copy(unifiedResult = (it.unifiedResult ?: MinifluxUnifiedSyncResult()).interrupted(error))
+                            } else if (deletionDryRun) {
+                                it.copy(deletionResult = MinifluxDeletionResult(false, error))
+                            } else {
+                                it.copy(failed = true, errorType = error)
+                            }
                         }
                     } finally {
-                        if (!readStates && !deletionDryRun && !starStates) {
+                        if (!readStates && !deletionDryRun && !starStates && !unified) {
                             // Partial cache remains available; it is never marked complete on failure/cancel.
                             try {
                                 withTimeout(2000) {
@@ -298,8 +330,20 @@ class MinifluxCacheController(
                         }
                     }
                 }.also { operation ->
-                    operation.invokeOnCompletion {
-                        mutableState.update { it.copy(busy = false) }
+                    operation.invokeOnCompletion { cause ->
+                        mutableState.update {
+                            it.copy(
+                                busy = false,
+                                unifiedResult =
+                                    if (unified &&
+                                        cause is CancellationException
+                                    ) {
+                                        (it.unifiedResult ?: MinifluxUnifiedSyncResult()).interrupted("CANCELLED", cancelled = true)
+                                    } else {
+                                        it.unifiedResult
+                                    },
+                            )
+                        }
                         active.set(false)
                     }
                 }
