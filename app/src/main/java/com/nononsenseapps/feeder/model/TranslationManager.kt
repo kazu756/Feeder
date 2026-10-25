@@ -1,6 +1,7 @@
 package com.nononsenseapps.feeder.model
 
 import android.app.Application
+import com.nononsenseapps.feeder.archmodel.ArticleKey
 import com.nononsenseapps.feeder.archmodel.OpenAISettings
 import com.nononsenseapps.feeder.archmodel.Repository
 import com.nononsenseapps.feeder.archmodel.TranslationApiSettings
@@ -17,6 +18,8 @@ import com.nononsenseapps.feeder.openai.isLocalTranslation
 import com.nononsenseapps.feeder.ui.compose.feed.FeedListItem
 import com.nononsenseapps.feeder.util.FilePathProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -57,7 +60,7 @@ class TranslationManager(
                 )
             }
 
-            val cache = loadCache(item.id, settings, targetLanguage)
+            val cache = loadCache(ArticleKey(item.id), settings, targetLanguage)
             val titleHash = sha256(item.title)
             val snippetHash = sha256(item.snippet)
 
@@ -111,7 +114,7 @@ class TranslationManager(
                 return@withContext item
             }
 
-            val cache = loadCache(item.id, settings, targetLanguage)
+            val cache = loadCache(ArticleKey(item.id), settings, targetLanguage)
             val titleHash = sha256(item.title)
             val snippetHash = sha256(item.snippet)
             val cachedTitle =
@@ -170,7 +173,7 @@ class TranslationManager(
                     )
                 if (updatedCache != cache) {
                     saveCache(
-                        item.id,
+                        ArticleKey(item.id),
                         settings,
                         targetLanguage,
                         updatedCache,
@@ -247,7 +250,7 @@ class TranslationManager(
 
             if (updatedCache != cache) {
                 saveCache(
-                    item.id,
+                    ArticleKey(item.id),
                     settings,
                     targetLanguage,
                     updatedCache,
@@ -261,7 +264,7 @@ class TranslationManager(
         }
 
     suspend fun getOrTranslateArticle(
-        itemId: Long,
+        itemId: ArticleKey,
         title: String,
         html: String,
         isFullText: Boolean,
@@ -370,6 +373,7 @@ class TranslationManager(
                     translatedFullArticleHtml = if (isFullText) translatedHtml else cache.translatedFullArticleHtml,
                 )
 
+            currentCoroutineContext().ensureActive()
             saveCache(itemId, settings, targetLanguage, updatedCache)
 
             ArticleTranslation(
@@ -380,7 +384,7 @@ class TranslationManager(
         }
 
     suspend fun getOrTranslateArticleWithAi(
-        itemId: Long,
+        itemId: ArticleKey,
         title: String,
         html: String,
         isFullText: Boolean,
@@ -418,12 +422,13 @@ class TranslationManager(
                     fullArticleHtmlHash = if (isFullText) htmlHash else cache.fullArticleHtmlHash,
                     translatedFullArticleHtml = if (isFullText) translatedHtml else cache.translatedFullArticleHtml,
                 )
+            currentCoroutineContext().ensureActive()
             saveCache(itemId, settings, AI_TARGET_LANGUAGE, updatedCache, AI_CACHE_PROVIDER)
             ArticleTranslation(translatedTitle, translatedHtml, cache.sourceLanguage)
         }
 
     suspend fun hasCachedTranslatedArticle(
-        itemId: Long,
+        itemId: ArticleKey,
         title: String,
         html: String,
         isFullText: Boolean,
@@ -460,7 +465,7 @@ class TranslationManager(
         }
 
     suspend fun detectArticleAlreadyInTargetLanguage(
-        itemId: Long,
+        itemId: ArticleKey,
         title: String,
         html: String,
         isFullText: Boolean,
@@ -480,7 +485,7 @@ class TranslationManager(
         }
 
     private fun loadCache(
-        itemId: Long,
+        itemId: ArticleKey,
         settings: OpenAISettings,
         targetLanguage: String,
         providerOverride: String? = null,
@@ -492,7 +497,7 @@ class TranslationManager(
             ?: CachedTranslations()
 
     private fun saveCache(
-        itemId: Long,
+        itemId: ArticleKey,
         settings: OpenAISettings,
         targetLanguage: String,
         cache: CachedTranslations,
@@ -504,7 +509,7 @@ class TranslationManager(
     }
 
     private fun cacheFile(
-        itemId: Long,
+        itemId: ArticleKey,
         settings: OpenAISettings,
         targetLanguage: String,
         providerOverride: String? = null,
@@ -513,7 +518,7 @@ class TranslationManager(
         return filePathProvider.cacheDir
             .resolve("translations")
             .resolve(
-                "$itemId.$provider.${
+                "${translationCacheIdentity(itemId)}.$provider.${
                     targetLanguage
                         .trim()
                         .lowercase()
@@ -649,7 +654,7 @@ class TranslationManager(
         }.getOrNull()
 
     private fun detectArticleAlreadyInTargetLanguage(
-        itemId: Long,
+        itemId: ArticleKey,
         title: String,
         html: String,
         isFullText: Boolean,
@@ -791,3 +796,6 @@ internal fun translationCacheProvider(
         settings.isDeepL -> "deepl"
         else -> "openai"
     }
+
+/** Preserve existing RSS cache filenames while isolating every Miniflux profile. */
+internal fun translationCacheIdentity(key: ArticleKey): String = if (key.isMiniflux) "miniflux-${key.profileId}-${key.localId}" else key.localId.toString()

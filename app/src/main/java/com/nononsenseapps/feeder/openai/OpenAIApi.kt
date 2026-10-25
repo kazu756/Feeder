@@ -222,6 +222,7 @@ class OpenAIApi(
                 detectedLanguage = summaryResponse.lang,
             )
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             return SummaryResult.Error(content = e.message ?: e.cause?.message ?: "")
         }
     }
