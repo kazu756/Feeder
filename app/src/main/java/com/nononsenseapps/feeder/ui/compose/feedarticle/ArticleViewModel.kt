@@ -103,9 +103,20 @@ class ArticleViewModel(
     val scrollPosition: Int get() =
         state["scrollPosition"] ?: 0
 
+    val articleKey =
+        com.nononsenseapps.feeder.archmodel
+            .ArticleKey(itemId, state.get<String>("profile")?.takeIf { it.isNotBlank() })
+    private val isMiniflux get() = articleKey.isMiniflux
+
+    private fun unsupportedExtra(): Boolean {
+        if (!isMiniflux) return false
+        viewModelScope.launch { toastMaker.makeToast(R.string.miniflux_main_local_only) }
+        return true
+    }
+
     private val articleFlow =
         repository
-            .getArticleFlow(itemId)
+            .getArticleFlow(articleKey)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
@@ -249,16 +260,16 @@ class ArticleViewModel(
                         article?.wordCount ?: 0
                     },
                 image = article?.image,
-                showSummarize = summarySettings.canSummarize && !article?.link.isNullOrEmpty(),
+                showSummarize = !isMiniflux && summarySettings.canSummarize && !article?.link.isNullOrEmpty(),
                 openAiSummary = openAiSummary,
                 showTranslate =
                     shouldShowStandardTranslationAction(
-                        canTranslate = isShowingTranslated || (canRequestTranslation && alreadyInPreferredLanguage == null),
+                        canTranslate = !isMiniflux && (isShowingTranslated || (canRequestTranslation && alreadyInPreferredLanguage == null)),
                         translationOperationLoading = translationOperationLoading,
                     ),
                 showTranslateWithAi =
                     shouldShowAiTranslationAction(
-                        canSummarize = summarySettings.canSummarize,
+                        canSummarize = !isMiniflux && summarySettings.canSummarize,
                         hasArticleLink = !article?.link.isNullOrEmpty(),
                         translationOperationLoading = translationOperationLoading,
                     ),
@@ -283,6 +294,7 @@ class ArticleViewModel(
         viewModelScope.launch {
             articleFlow.collect { article ->
                 val feedId = article?.item?.feedId ?: return@collect
+                if (isMiniflux) return@collect
                 if (handledInitialOpenActions) {
                     return@collect
                 }
@@ -312,6 +324,7 @@ class ArticleViewModel(
                 repository.preferredTranslationLanguage,
             ) { article, fullTextOverride, settings, targetLanguage ->
                 val currentArticle = article ?: return@combine null
+                if (isMiniflux) return@combine null
                 val fullText = fullTextOverride ?: currentArticle.fullTextByDefault
                 if (!settings.canUseAsTranslationApi || targetLanguage.trim().isBlank() || currentArticle.link.isNullOrBlank()) {
                     return@combine null
@@ -355,6 +368,7 @@ class ArticleViewModel(
     }
 
     fun toggleFullText() {
+        if (unsupportedExtra()) return
         // Using as general loading text
         textToDisplay.update { TextToDisplay.LOADING_FULLTEXT }
         displayFullTextOverride.value = displayFullTextOverride.value?.not() ?: articleFlow.value?.fullTextByDefault?.not() ?: true
@@ -364,6 +378,7 @@ class ArticleViewModel(
     }
 
     fun requestFullTextFromPull() {
+        if (unsupportedExtra()) return
         if (isFullText || !_isPullFullTextLoading.compareAndSet(expect = false, update = true)) return
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -406,6 +421,11 @@ class ArticleViewModel(
                     openInBrowserText = application.getString(R.string.open_in_web_view),
                     articleLink = article.link ?: "",
                 )
+            if (isMiniflux) {
+                val html = repository.minifluxBody(articleKey)
+                textToDisplay.value = if (html.isNullOrBlank()) TextToDisplay.FAILED_MISSING_BODY else TextToDisplay.CONTENT
+                return@withContext if (html.isNullOrBlank()) LinearArticle(emptyList()) else htmlLinearizer.linearize(html, contentBaseUrl)
+            }
             val result =
                 resolveReaderContent(
                     loadFullText =
@@ -490,13 +510,13 @@ class ArticleViewModel(
 
     fun markAsUnread() {
         applicationCoroutineScope.launch {
-            repository.markAsUnread(itemId)
+            repository.markArticle(articleKey, true)
         }
     }
 
     fun setBookmarked(bookmarked: Boolean) =
         applicationCoroutineScope.launch {
-            repository.setBookmarked(itemId, bookmarked)
+            repository.bookmarkArticle(articleKey, bookmarked)
         }
 
     fun setToolbarMenuVisible(visible: Boolean) {
@@ -505,6 +525,7 @@ class ArticleViewModel(
     }
 
     fun ttsPlay() {
+        if (unsupportedExtra()) return
         stopPodcastPlayback()
         if (ttsStateHolder.resumeIfPausedOn(itemId)) {
             return
@@ -623,6 +644,7 @@ class ArticleViewModel(
     }
 
     fun summarize() {
+        if (unsupportedExtra()) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 openAiSummary.value = OpenAISummaryState.Loading
@@ -647,6 +669,7 @@ class ArticleViewModel(
     }
 
     fun translate() {
+        if (unsupportedExtra()) return
         if (aiTranslationLoading.value || standardTranslationLoading.value) {
             return
         }
@@ -735,6 +758,7 @@ class ArticleViewModel(
     }
 
     fun translateWithAi() {
+        if (unsupportedExtra()) return
         if (
             aiTranslationJob?.isActive == true ||
             aiTranslationLoading.value ||

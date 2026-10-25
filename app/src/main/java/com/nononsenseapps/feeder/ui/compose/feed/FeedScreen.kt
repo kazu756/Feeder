@@ -111,6 +111,7 @@ import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import com.nononsenseapps.feeder.ApplicationCoroutineScope
 import com.nononsenseapps.feeder.R
+import com.nononsenseapps.feeder.archmodel.ArticleKey
 import com.nononsenseapps.feeder.archmodel.FeedItemStyle
 import com.nononsenseapps.feeder.archmodel.FeedType
 import com.nononsenseapps.feeder.db.room.FeedItemCursor
@@ -193,9 +194,11 @@ fun FeedScreen(
             ActivityResultContracts.CreateDocument("application/json"),
         ) { uri ->
             if (uri != null) {
-                val applicationCoroutineScope: ApplicationCoroutineScope by di.instance()
-                applicationCoroutineScope.launch {
-                    exportSavedArticles(di, uri)
+                viewModel.localOnly {
+                    val applicationCoroutineScope: ApplicationCoroutineScope by di.instance()
+                    applicationCoroutineScope.launch {
+                        exportSavedArticles(di, uri)
+                    }
                 }
             }
         }
@@ -204,9 +207,11 @@ fun FeedScreen(
             ActivityResultContracts.CreateDocument("text/x-opml"),
         ) { uri ->
             if (uri != null) {
-                val applicationCoroutineScope: ApplicationCoroutineScope by di.instance()
-                applicationCoroutineScope.launch {
-                    exportOpml(di, uri)
+                viewModel.localOnly {
+                    val applicationCoroutineScope: ApplicationCoroutineScope by di.instance()
+                    applicationCoroutineScope.launch {
+                        exportOpml(di, uri)
+                    }
                 }
             }
         }
@@ -215,9 +220,11 @@ fun FeedScreen(
             ActivityResultContracts.OpenDocument(),
         ) { uri ->
             if (uri != null) {
-                val applicationCoroutineScope: ApplicationCoroutineScope by di.instance()
-                applicationCoroutineScope.launch {
-                    importOpml(di, uri)
+                viewModel.localOnly {
+                    val applicationCoroutineScope: ApplicationCoroutineScope by di.instance()
+                    applicationCoroutineScope.launch {
+                        importOpml(di, uri)
+                    }
                 }
             }
         }
@@ -226,9 +233,11 @@ fun FeedScreen(
             ActivityResultContracts.OpenDocument(),
         ) { uri ->
             if (uri != null) {
-                val applicationCoroutineScope: ApplicationCoroutineScope by di.instance()
-                applicationCoroutineScope.launch {
-                    importSavedArticles(di, uri)
+                viewModel.localOnly {
+                    val applicationCoroutineScope: ApplicationCoroutineScope by di.instance()
+                    applicationCoroutineScope.launch {
+                        importSavedArticles(di, uri)
+                    }
                 }
             }
         }
@@ -325,12 +334,12 @@ fun FeedScreen(
             podcastOnSeekBack = { viewModel.podcastSeekBy(-10_000) },
             podcastOnSeekForward = { viewModel.podcastSeekBy(10_000) },
             podcastOnSeekTo = viewModel::podcastSeekTo,
-            onAddFeed = { SearchFeedDestination.navigate(navController) },
+            onAddFeed = { viewModel.localOnly { SearchFeedDestination.navigate(navController) } },
             onEditFeed = { feedId ->
-                EditFeedDestination.navigate(navController, feedId)
+                viewModel.localOnly { EditFeedDestination.navigate(navController, feedId) }
             },
             onShowEditDialog = {
-                viewModel.setShowEditDialog(true)
+                viewModel.localOnly { viewModel.setShowEditDialog(true) }
             },
             onDismissEditDialog = {
                 viewModel.setShowEditDialog(false)
@@ -342,13 +351,13 @@ fun FeedScreen(
                 viewModel.renameTag(oldTag, newTag)
             },
             onShowDeleteDialog = {
-                viewModel.setShowDeleteDialog(true)
+                viewModel.localOnly { viewModel.setShowDeleteDialog(true) }
             },
             onDismissDeleteDialog = {
                 viewModel.setShowDeleteDialog(false)
             },
             onShowRenameTagDialog = {
-                viewModel.setShowRenameTagDialog(true)
+                viewModel.localOnly { viewModel.setShowRenameTagDialog(true) }
             },
             onDismissRenameTagDialog = {
                 viewModel.setShowRenameTagDialog(false)
@@ -356,69 +365,77 @@ fun FeedScreen(
             onSettings = {
                 SettingsDestination.navigate(navController)
             },
-            onUnreadDigest = { UnreadDigestDestination.navigate(navController) },
+            onUnreadDigest = { viewModel.localOnly { UnreadDigestDestination.navigate(navController) } },
             canSummarize = canSummarize,
             onImport = {
-                try {
-                    opmlImporter.launch(
-                        arrayOf(
-                            // All valid for OPML files
-                            "text/xml",
-                            "text/x-opml",
-                            "application/xml",
-                            // This is the mimetype the file actually gets when exported
-                            "application/json",
-                            "application/octet-stream",
-                            // But just in case a file isn't named right etc, accept all
-                            "*/*",
-                        ),
-                    )
-                } catch (_: Exception) {
-                    // ActivityNotFoundException in particular
-                    coroutineScope.launch {
-                        toastMaker.makeToast(R.string.failed_to_import_OPML)
+                viewModel.localOnly {
+                    try {
+                        opmlImporter.launch(
+                            arrayOf(
+                                // All valid for OPML files
+                                "text/xml",
+                                "text/x-opml",
+                                "application/xml",
+                                // This is the mimetype the file actually gets when exported
+                                "application/json",
+                                "application/octet-stream",
+                                // But just in case a file isn't named right etc, accept all
+                                "*/*",
+                            ),
+                        )
+                    } catch (_: Exception) {
+                        // ActivityNotFoundException in particular
+                        coroutineScope.launch {
+                            toastMaker.makeToast(R.string.failed_to_import_OPML)
+                        }
                     }
                 }
             },
             onExportOPML = {
-                try {
-                    opmlExporter.launch("feeder-export-${LocalDate.now()}-${LocalTime.now().toSecondOfDay()}.opml")
-                } catch (_: Exception) {
-                    // ActivityNotFoundException in particular
-                    coroutineScope.launch {
-                        toastMaker.makeToast(R.string.failed_to_export_OPML)
+                viewModel.localOnly {
+                    try {
+                        opmlExporter.launch("feeder-export-${LocalDate.now()}-${LocalTime.now().toSecondOfDay()}.opml")
+                    } catch (_: Exception) {
+                        // ActivityNotFoundException in particular
+                        coroutineScope.launch {
+                            toastMaker.makeToast(R.string.failed_to_export_OPML)
+                        }
                     }
                 }
             },
             onImportSavedArticles = {
-                try {
-                    savedArticleImporter.launch(
-                        arrayOf(
-                            "text/plain",
-                            // This is the mimetype the file may get from older exports
-                            "application/octet-stream",
-                            // But just in case a file isn't named right etc, accept all
-                            "*/*",
-                        ),
-                    )
-                } catch (_: Exception) {
-                    // ActivityNotFoundException in particular
-                    coroutineScope.launch {
-                        toastMaker.makeToast(R.string.failed_to_import_saved_articles)
+                viewModel.localOnly {
+                    try {
+                        savedArticleImporter.launch(
+                            arrayOf(
+                                "text/plain",
+                                // This is the mimetype the file may get from older exports
+                                "application/octet-stream",
+                                // But just in case a file isn't named right etc, accept all
+                                "*/*",
+                            ),
+                        )
+                    } catch (_: Exception) {
+                        // ActivityNotFoundException in particular
+                        coroutineScope.launch {
+                            toastMaker.makeToast(R.string.failed_to_import_saved_articles)
+                        }
                     }
                 }
             },
             onExportSavedArticles = {
-                try {
-                    savedArticleExporter.launch(
-                        "feeder-saved-articles-${LocalDate.now()}-${
-                            LocalTime.now().toSecondOfDay()
-                        }.json",
-                    )
-                } catch (_: Exception) {
-                    // ActivityNotFoundException in particular
-                    coroutineScope.launch {
-                        toastMaker.makeToast(R.string.failed_to_export_saved_articles)
+                viewModel.localOnly {
+                    try {
+                        savedArticleExporter.launch(
+                            "feeder-saved-articles-${LocalDate.now()}-${
+                                LocalTime.now().toSecondOfDay()
+                            }.json",
+                        )
+                    } catch (_: Exception) {
+                        // ActivityNotFoundException in particular
+                        coroutineScope.launch {
+                            toastMaker.makeToast(R.string.failed_to_export_saved_articles)
+                        }
                     }
                 }
             },
@@ -558,15 +575,15 @@ fun FeedScreen(
     onImportSavedArticles: () -> Unit,
     onExportSavedArticles: () -> Unit,
     drawerState: DrawerState,
-    markAsUnread: (Long, Boolean) -> Unit,
-    markAsReadOnSwipe: (id: Long, unread: Boolean, saved: Boolean) -> Unit,
+    markAsUnread: (ArticleKey, Boolean) -> Unit,
+    markAsReadOnSwipe: (id: ArticleKey, unread: Boolean, saved: Boolean) -> Unit,
     markBeforeAsRead: (FeedItemCursor) -> Unit,
     markAfterAsRead: (FeedItemCursor) -> Unit,
-    onOpenFeedItem: (Long) -> Unit,
-    onOpenFeedItemInReader: (Long) -> Unit,
-    onOpenFeedItemInCustomTab: (Long) -> Unit,
-    onOpenFeedItemInBrowser: (Long) -> Unit,
-    onSetBookmark: (Long, Boolean) -> Unit,
+    onOpenFeedItem: (ArticleKey) -> Unit,
+    onOpenFeedItemInReader: (ArticleKey) -> Unit,
+    onOpenFeedItemInCustomTab: (ArticleKey) -> Unit,
+    onOpenFeedItemInBrowser: (ArticleKey) -> Unit,
+    onSetBookmark: (ArticleKey, Boolean) -> Unit,
     onShowFilterMenu: (Boolean) -> Unit,
     filterCallback: FeedListFilterCallback,
     onShowSearchBar: (Boolean) -> Unit,
@@ -1378,15 +1395,15 @@ fun FeedListContent(
     viewState: FeedScreenViewState,
     onOpenNavDrawer: () -> Unit,
     onAddFeed: () -> Unit,
-    markAsUnread: (Long, Boolean) -> Unit,
-    markAsReadOnSwipe: (id: Long, unread: Boolean, saved: Boolean) -> Unit,
+    markAsUnread: (ArticleKey, Boolean) -> Unit,
+    markAsReadOnSwipe: (id: ArticleKey, unread: Boolean, saved: Boolean) -> Unit,
     markBeforeAsRead: (FeedItemCursor) -> Unit,
     markAfterAsRead: (FeedItemCursor) -> Unit,
-    onItemClick: (Long) -> Unit,
-    onOpenFeedItemInReader: (Long) -> Unit,
-    onOpenFeedItemInCustomTab: (Long) -> Unit,
-    onOpenFeedItemInBrowser: (Long) -> Unit,
-    onSetBookmark: (Long, Boolean) -> Unit,
+    onItemClick: (ArticleKey) -> Unit,
+    onOpenFeedItemInReader: (ArticleKey) -> Unit,
+    onOpenFeedItemInCustomTab: (ArticleKey) -> Unit,
+    onOpenFeedItemInBrowser: (ArticleKey) -> Unit,
+    onSetBookmark: (ArticleKey, Boolean) -> Unit,
     listState: LazyListState,
     pagedFeedItems: LazyPagingItems<FeedListItem>,
     translatedFeedCards: TranslatedFeedCards,
@@ -1471,14 +1488,14 @@ fun FeedListContent(
                 }
                 items(
                     count = pagedFeedItems.itemCount,
-                    key = pagedFeedItems.itemKey { it.id },
+                    key = pagedFeedItems.itemKey { it.articleKey.stableKey },
                     contentType = pagedFeedItems.itemContentType { it.contentType(viewState.feedItemStyle) },
                 ) { itemIndex ->
                     val loadedItem = pagedFeedItems[itemIndex] ?: PLACEHOLDER_ITEM
                     val previewItem = translatedFeedCards.merge(loadedItem)
 
                     val itemCoroutineScope = rememberCoroutineScope()
-                    var itemWasVisible by remember(previewItem.id) { mutableStateOf(false) }
+                    var itemWasVisible by remember(previewItem.articleKey) { mutableStateOf(false) }
 
                     LaunchedEffect(loadedItem.id, loadedItem.title, loadedItem.snippet, translatedFeedCards.generation, onTranslateFeedCard) {
                         onTranslateFeedCard(loadedItem)
@@ -1486,12 +1503,12 @@ fun FeedListContent(
 
                     // Gets executed when only unread items are being shown
                     // Marks items which have been visible as read when they scroll off screen
-                    DisposableEffect(previewItem.id, markAsUnread) {
+                    DisposableEffect(previewItem.articleKey, markAsUnread) {
                         onDispose {
                             if (itemWasVisible) {
                                 coroutineScope.launch {
                                     logDebug(LOG_TAG, "Marking ${previewItem.id} as read")
-                                    markAsUnread(previewItem.id, false)
+                                    markAsUnread(previewItem.articleKey, false)
                                 }
                             }
                         }
@@ -1500,7 +1517,7 @@ fun FeedListContent(
                     SwipeableFeedItemPreview(
                         onSwipe = { currentState ->
                             markAsReadOnSwipe(
-                                previewItem.id,
+                                previewItem.articleKey,
                                 !currentState,
                                 previewItem.bookmarked,
                             )
@@ -1526,7 +1543,7 @@ fun FeedListContent(
                             markAfterAsRead(previewItem.cursor)
                         },
                         onToggleBookmark = {
-                            onSetBookmark(previewItem.id, !previewItem.bookmarked)
+                            onSetBookmark(previewItem.articleKey, !previewItem.bookmarked)
                         },
                         onShareItem = {
                             val intent =
@@ -1549,16 +1566,16 @@ fun FeedListContent(
                             )
                         },
                         onItemClick = {
-                            onItemClick(previewItem.id)
+                            onItemClick(previewItem.articleKey)
                         },
                         onOpenFeedItemInReader = {
-                            onOpenFeedItemInReader(previewItem.id)
+                            onOpenFeedItemInReader(previewItem.articleKey)
                         },
                         onOpenFeedItemInCustomTab = {
-                            onOpenFeedItemInCustomTab(previewItem.id)
+                            onOpenFeedItemInCustomTab(previewItem.articleKey)
                         },
                         onOpenFeedItemInBrowser = {
-                            onOpenFeedItemInBrowser(previewItem.id)
+                            onOpenFeedItemInBrowser(previewItem.articleKey)
                         },
                         modifier =
                             Modifier
@@ -1592,7 +1609,7 @@ fun FeedListContent(
                                                         // Marks as read in disposable effect
                                                     } else {
                                                         logDebug(LOG_TAG, "Item $itemIndex marking as read")
-                                                        markAsUnread(previewItem.id, false)
+                                                        markAsUnread(previewItem.articleKey, false)
                                                     }
                                                 }
                                             }
@@ -1644,15 +1661,15 @@ fun FeedGridContent(
     viewState: FeedScreenViewState,
     onOpenNavDrawer: () -> Unit,
     onAddFeed: () -> Unit,
-    markAsUnread: (Long, Boolean) -> Unit,
-    markAsReadOnSwipe: (id: Long, unread: Boolean, saved: Boolean) -> Unit,
+    markAsUnread: (ArticleKey, Boolean) -> Unit,
+    markAsReadOnSwipe: (id: ArticleKey, unread: Boolean, saved: Boolean) -> Unit,
     markBeforeAsRead: (FeedItemCursor) -> Unit,
     markAfterAsRead: (FeedItemCursor) -> Unit,
-    onItemClick: (Long) -> Unit,
-    onOpenFeedItemInReader: (Long) -> Unit,
-    onOpenFeedItemInCustomTab: (Long) -> Unit,
-    onOpenFeedItemInBrowser: (Long) -> Unit,
-    onSetBookmark: (Long, Boolean) -> Unit,
+    onItemClick: (ArticleKey) -> Unit,
+    onOpenFeedItemInReader: (ArticleKey) -> Unit,
+    onOpenFeedItemInCustomTab: (ArticleKey) -> Unit,
+    onOpenFeedItemInBrowser: (ArticleKey) -> Unit,
+    onSetBookmark: (ArticleKey, Boolean) -> Unit,
     gridState: LazyStaggeredGridState,
     pagedFeedItems: LazyPagingItems<FeedListItem>,
     translatedFeedCards: TranslatedFeedCards,
@@ -1716,14 +1733,14 @@ fun FeedGridContent(
             ) {
                 items(
                     count = pagedFeedItems.itemCount,
-                    key = pagedFeedItems.itemKey { it.id },
+                    key = pagedFeedItems.itemKey { it.articleKey.stableKey },
                     contentType = pagedFeedItems.itemContentType { it.contentType(viewState.feedItemStyle) },
                 ) { itemIndex ->
                     val loadedItem = pagedFeedItems[itemIndex] ?: PLACEHOLDER_ITEM
                     val previewItem = translatedFeedCards.merge(loadedItem)
 
                     val itemCoroutineScope = rememberCoroutineScope()
-                    var itemWasVisible by remember(previewItem.id) { mutableStateOf(false) }
+                    var itemWasVisible by remember(previewItem.articleKey) { mutableStateOf(false) }
 
                     LaunchedEffect(loadedItem.id, loadedItem.title, loadedItem.snippet, translatedFeedCards.generation, onTranslateFeedCard) {
                         onTranslateFeedCard(loadedItem)
@@ -1731,12 +1748,12 @@ fun FeedGridContent(
 
                     // Gets executed when only unread items are being shown
                     // Marks items which have been visible as read when they scroll off screen
-                    DisposableEffect(previewItem.id, markAsUnread) {
+                    DisposableEffect(previewItem.articleKey, markAsUnread) {
                         onDispose {
                             if (itemWasVisible) {
                                 coroutineScope.launch {
                                     logDebug(LOG_TAG, "Marking ${previewItem.id} as read")
-                                    markAsUnread(previewItem.id, false)
+                                    markAsUnread(previewItem.articleKey, false)
                                 }
                             }
                         }
@@ -1745,7 +1762,7 @@ fun FeedGridContent(
                     SwipeableFeedItemPreview(
                         onSwipe = { currentState ->
                             markAsReadOnSwipe(
-                                previewItem.id,
+                                previewItem.articleKey,
                                 !currentState,
                                 previewItem.bookmarked,
                             )
@@ -1771,7 +1788,7 @@ fun FeedGridContent(
                             markAfterAsRead(previewItem.cursor)
                         },
                         onToggleBookmark = {
-                            onSetBookmark(previewItem.id, !previewItem.bookmarked)
+                            onSetBookmark(previewItem.articleKey, !previewItem.bookmarked)
                         },
                         onShareItem = {
                             val intent =
@@ -1794,16 +1811,16 @@ fun FeedGridContent(
                             )
                         },
                         onItemClick = {
-                            onItemClick(previewItem.id)
+                            onItemClick(previewItem.articleKey)
                         },
                         onOpenFeedItemInReader = {
-                            onOpenFeedItemInReader(previewItem.id)
+                            onOpenFeedItemInReader(previewItem.articleKey)
                         },
                         onOpenFeedItemInCustomTab = {
-                            onOpenFeedItemInCustomTab(previewItem.id)
+                            onOpenFeedItemInCustomTab(previewItem.articleKey)
                         },
                         onOpenFeedItemInBrowser = {
-                            onOpenFeedItemInBrowser(previewItem.id)
+                            onOpenFeedItemInBrowser(previewItem.articleKey)
                         },
                         modifier =
                             if (viewState.markAsReadOnScroll && previewItem.unread) {
@@ -1821,7 +1838,7 @@ fun FeedGridContent(
                                                     // Marks as read in disposable effect
                                                 } else {
                                                     logDebug(LOG_TAG, "Item $itemIndex marking as read")
-                                                    markAsUnread(previewItem.id, false)
+                                                    markAsUnread(previewItem.articleKey, false)
                                                 }
                                             }
                                         }

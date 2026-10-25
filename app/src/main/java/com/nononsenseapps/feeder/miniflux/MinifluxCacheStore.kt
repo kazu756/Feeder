@@ -77,6 +77,12 @@ class MinifluxCacheStore(
         }
     }
 
+    fun existingDatabase(profileId: String): MinifluxCacheDatabase {
+        require(Regex("[a-f0-9]{64}").matches(profileId))
+        check(context.getDatabasePath("miniflux_cache_$profileId.db").isFile) { "Miniflux cache unavailable" }
+        return database(profileId)
+    }
+
     @Synchronized
     fun close() {
         databases.values.forEach { it.close() }

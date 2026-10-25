@@ -51,10 +51,40 @@ class MinifluxUnifiedSync(
     private val cacheTimeoutMillis: Long = 45_000,
     private val reconciliationTimeoutMillis: Long = 30_000,
 ) {
+    private val running = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val busy: kotlinx.coroutines.flow.StateFlow<Boolean> = running
+
     suspend fun sync(
         baseUrl: String,
         token: String,
         progress: (MinifluxUnifiedSyncResult) -> Unit = {},
+    ): MinifluxUnifiedSyncResult = runSync(baseUrl, token, null, progress)
+
+    suspend fun syncPinned(
+        baseUrl: String,
+        token: String,
+        profile: String,
+    ): MinifluxUnifiedSyncResult = runSync(baseUrl, token, profile) {}
+
+    private suspend fun runSync(
+        baseUrl: String,
+        token: String,
+        expectedProfile: String?,
+        progress: (MinifluxUnifiedSyncResult) -> Unit,
+    ): MinifluxUnifiedSyncResult {
+        if (!running.compareAndSet(false, true)) return MinifluxUnifiedSyncResult(overall = MinifluxUnifiedOverall.FAILED, errorType = "ALREADY_RUNNING")
+        return try {
+            syncInternal(baseUrl, token, expectedProfile, progress)
+        } finally {
+            running.value = false
+        }
+    }
+
+    private suspend fun syncInternal(
+        baseUrl: String,
+        token: String,
+        expectedProfile: String?,
+        progress: (MinifluxUnifiedSyncResult) -> Unit,
     ): MinifluxUnifiedSyncResult {
         var result = MinifluxUnifiedSyncResult()
         var profile: MinifluxProfile? = null
@@ -130,6 +160,7 @@ class MinifluxUnifiedSync(
                     validateMinifluxToken(token)
                     profile = store.selectedProfile()?.takeIf { it.baseUrl == base.toString() }
                     val account = api.me(base, token)
+                    check(expectedProfile == null || minifluxProfileId(base.toString(), account.id) == expectedProfile) { "Profile mismatch" }
                     val active = store.prepare(base.toString(), account.copy(username = account.username.replace(token, "[redacted]")))
                     profile = active
                     val db = store.database(active.id)

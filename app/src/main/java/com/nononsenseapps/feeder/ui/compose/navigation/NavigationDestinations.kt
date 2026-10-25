@@ -438,6 +438,10 @@ data object ArticleDestination : NavigationDestination(
     path = "reader",
     navArguments =
         listOf(
+            QueryParamArgument("profile") {
+                type = NavType.StringType
+                defaultValue = ""
+            },
             PathParamArgument("itemId") {
                 type = NavType.LongType
             },
@@ -458,6 +462,13 @@ data object ArticleDestination : NavigationDestination(
         }
     }
 
+    fun navigate(
+        navController: NavController,
+        key: com.nononsenseapps.feeder.archmodel.ArticleKey,
+    ) {
+        if (!key.isMiniflux) navigate(navController, key.localId) else navController.navigate("$path/${key.localId}?profile=${key.profileId}") { launchSingleTop = true }
+    }
+
     @Composable
     override fun RegisterScreen(
         navController: NavController,
@@ -474,8 +485,12 @@ data object ArticleDestination : NavigationDestination(
         val navigationDeepLinkViewModel: NavigationDeepLinkViewModel =
             backStackEntry.diAwareViewModel()
 
-        LaunchedEffect(itemId) {
-            navigationDeepLinkViewModel.setCurrentArticle(itemId = itemId)
+        val profile = backStackEntry.arguments?.getString("profile")?.takeIf { it.isNotBlank() }
+        LaunchedEffect(itemId, profile) {
+            navigationDeepLinkViewModel.openArticle(
+                com.nononsenseapps.feeder.archmodel
+                    .ArticleKey(itemId, profile),
+            )
         }
 
         ArticleScreen(
@@ -485,7 +500,7 @@ data object ArticleDestination : NavigationDestination(
                 }
             },
             onNavigateToFeed = { feedId ->
-                FeedDestination.navigate(navController, feedId = feedId)
+                FeedDestination.navigate(navController, feedId = if (navigationDeepLinkViewModel.readerMatchesMain(profile)) feedId else ID_UNSET)
             },
             viewModel = backStackEntry.diAwareViewModel(),
             mainActivityViewModel = mainActivityViewModel,

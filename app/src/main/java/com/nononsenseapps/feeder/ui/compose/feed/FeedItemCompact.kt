@@ -174,10 +174,14 @@ data class FeedListItem(
     val primarySortTime: Instant,
     val rawPubDate: ZonedDateTime?,
     val wordCount: Int,
+    val articleKey: com.nononsenseapps.feeder.archmodel.ArticleKey =
+        com.nononsenseapps.feeder.archmodel
+            .ArticleKey(id),
 ) {
     val cursor: FeedItemCursor
         get() =
-            object : FeedItemCursor {
+            object : com.nononsenseapps.feeder.archmodel.ArticleCursor {
+                override val articleKey = this@FeedListItem.articleKey
                 override val primarySortTime: Instant = this@FeedListItem.primarySortTime
                 override val pubDate: ZonedDateTime? = this@FeedListItem.rawPubDate
                 override val id: Long = this@FeedListItem.id

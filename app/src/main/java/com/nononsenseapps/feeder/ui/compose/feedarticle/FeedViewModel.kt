@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.nononsenseapps.feeder.ApplicationCoroutineScope
+import com.nononsenseapps.feeder.archmodel.ArticleCursor
+import com.nononsenseapps.feeder.archmodel.ArticleKey
 import com.nononsenseapps.feeder.archmodel.FeedItemStyle
 import com.nononsenseapps.feeder.archmodel.FeedType
 import com.nononsenseapps.feeder.archmodel.ItemOpener
@@ -62,6 +64,18 @@ class FeedViewModel(
 ) : DIAwareViewModel(di),
     FeedListFilterCallback {
     private val repository: Repository by instance()
+    private val toastMaker: com.nononsenseapps.feeder.util.ToastMaker by instance()
+
+    fun localOnly(action: () -> Unit) {
+        if (repository.isMinifluxMain) viewModelScope.launch { toastMaker.makeToast(com.nononsenseapps.feeder.R.string.miniflux_main_local_only) } else action()
+    }
+
+    init {
+        viewModelScope.launch {
+            repository.mainBackendError.collect { message -> if (message != null) toastMaker.makeToast(message) }
+        }
+    }
+
     private val ttsStateHolder: TTSStateHolder by instance()
     private val podcastPlayerStateHolder: PodcastPlayerStateHolder by instance()
     private val filePathProvider: FilePathProvider by instance()
@@ -132,6 +146,10 @@ class FeedViewModel(
 
     fun deleteFeeds(feedIds: List<Long>) =
         applicationCoroutineScope.launch {
+            if (repository.isMinifluxMain) {
+                toastMaker.makeToast(com.nononsenseapps.feeder.R.string.miniflux_main_local_only)
+                return@launch
+            }
             repository.deleteFeeds(feedIds)
         }
 
@@ -139,50 +157,67 @@ class FeedViewModel(
         oldTag: String,
         newTag: String,
     ) = applicationCoroutineScope.launch {
+        if (repository.isMinifluxMain) {
+            toastMaker.makeToast(com.nononsenseapps.feeder.R.string.miniflux_main_local_only)
+            return@launch
+        }
         repository.renameTag(oldTag, newTag)
     }
 
-    fun markAllAsRead() =
+    fun markAllAsRead() {
+        if (repository.isMinifluxMain) {
+            repository.markMainSelection()
+            return
+        }
+        val (feedId, feedTag) = repository.localMainSelection()
+        applicationCoroutineScope.launch { repository.markAllAsReadInFeedOrTag(feedId, feedTag) }
+    }
+
+    fun markAsUnread(itemId: ArticleKey) =
         applicationCoroutineScope.launch {
-            val (feedId, feedTag) = repository.currentFeedAndTag.value
-            repository.markAllAsReadInFeedOrTag(feedId, feedTag)
+            repository.markArticle(itemId, true)
         }
 
-    fun markAsUnread(itemId: Long) =
+    fun markAsRead(itemId: ArticleKey) =
         applicationCoroutineScope.launch {
-            repository.markAsUnread(itemId)
+            repository.markArticle(itemId, false)
         }
 
-    fun markAsRead(itemId: Long) =
+    fun markAsReadOnSwipe(itemId: ArticleKey) =
         applicationCoroutineScope.launch {
-            repository.markAsReadAndNotified(itemId)
+            if (itemId.isMiniflux) repository.markArticle(itemId, false) else repository.markAsReadAndNotified(itemId = itemId.localId, readTimeBeforeMinReadTime = true)
         }
 
-    fun markAsReadOnSwipe(itemId: Long) =
-        applicationCoroutineScope.launch {
-            repository.markAsReadAndNotified(itemId = itemId, readTimeBeforeMinReadTime = true)
+    fun markBeforeAsRead(cursor: FeedItemCursor) {
+        if ((cursor as? ArticleCursor)?.articleKey?.isMiniflux == true) {
+            repository.markMainSelection(cursor, true)
+            return
         }
+        val (feedId, feedTag) = repository.localMainSelection()
+        applicationCoroutineScope.launch { repository.markBeforeAsRead(cursor, feedId, feedTag) }
+    }
 
-    fun markBeforeAsRead(cursor: FeedItemCursor) =
-        applicationCoroutineScope.launch {
-            val (feedId, feedTag) = repository.currentFeedAndTag.value
-            repository.markBeforeAsRead(cursor, feedId, feedTag)
+    fun markAfterAsRead(cursor: FeedItemCursor) {
+        if ((cursor as? ArticleCursor)?.articleKey?.isMiniflux == true) {
+            repository.markMainSelection(cursor, false)
+            return
         }
-
-    fun markAfterAsRead(cursor: FeedItemCursor) =
-        applicationCoroutineScope.launch {
-            val (feedId, feedTag) = repository.currentFeedAndTag.value
-            repository.markAfterAsRead(cursor, feedId, feedTag)
-        }
+        val (feedId, feedTag) = repository.localMainSelection()
+        applicationCoroutineScope.launch { repository.markAfterAsRead(cursor, feedId, feedTag) }
+    }
 
     fun setBookmarked(
-        itemId: Long,
+        itemId: ArticleKey,
         bookmarked: Boolean,
     ) = applicationCoroutineScope.launch {
-        repository.setBookmarked(itemId, bookmarked)
+        repository.bookmarkArticle(itemId, bookmarked)
     }
 
     fun requestImmediateSyncOfCurrentFeedOrTag() {
+        if (repository.isMinifluxMain) {
+            repository.refreshMinifluxMain()
+            return
+        }
         val (feedId, feedTag) = repository.currentFeedAndTag.value
         runOnceRssSync(
             di = di,
@@ -194,6 +229,10 @@ class FeedViewModel(
     }
 
     fun requestImmediateSyncOfAll() {
+        if (repository.isMinifluxMain) {
+            repository.refreshMinifluxMain()
+            return
+        }
         runOnceRssSync(
             di = di,
             forceNetwork = true,
@@ -231,7 +270,7 @@ class FeedViewModel(
     }
 
     fun translateFeedCardIfNeeded(item: FeedListItem) {
-        if (item.id == ID_UNSET) {
+        if (item.articleKey.isMiniflux || item.id == ID_UNSET) {
             return
         }
 
@@ -324,7 +363,7 @@ class FeedViewModel(
 
     private fun currentFeedCardTranslationConfig(): FeedCardTranslationConfig? =
         feedCardTranslationConfig(
-            enabled = repository.translateArticlePreviewsByDefault.value,
+            enabled = !repository.isMinifluxMain && repository.translateArticlePreviewsByDefault.value,
             settings = repository.translationApiSettings.value,
             targetLanguage = repository.preferredTranslationLanguage.value,
         ).takeIf(FeedCardTranslationConfig::isActive)
@@ -392,19 +431,19 @@ class FeedViewModel(
         renameTagDialogVisible.update { visible }
     }
 
-    private fun setCurrentArticle(itemId: Long) {
-        repository.setCurrentArticle(itemId)
+    private fun setCurrentArticle(itemId: ArticleKey) {
+        if (!itemId.isMiniflux) repository.setCurrentArticle(itemId.localId)
         repository.setIsArticleOpen(true)
     }
 
     fun openArticle(
-        itemId: Long,
+        itemId: ArticleKey,
         openInCustomTab: (String) -> Unit,
         openInBrowser: (String) -> Unit,
         navigateToArticle: () -> Unit,
     ) = viewModelScope.launch {
-        val itemOpener = repository.getArticleOpener(itemId = itemId)
-        val articleLink = repository.getLink(itemId)
+        val itemOpener = if (itemId.isMiniflux) ItemOpener.READER else repository.getArticleOpener(itemId = itemId.localId)
+        val articleLink = repository.articleLink(itemId)
         when {
             ItemOpener.CUSTOM_TAB == itemOpener && articleLink != null -> {
                 openInCustomTab(articleLink)
@@ -423,11 +462,11 @@ class FeedViewModel(
     }
 
     fun openArticleInCustomTab(
-        itemId: Long,
+        itemId: ArticleKey,
         openInCustomTab: (String) -> Unit,
         onNoArticleLink: () -> Unit,
     ) = viewModelScope.launch {
-        val articleLink = repository.getLink(itemId)
+        val articleLink = repository.articleLink(itemId)
         if (articleLink != null) {
             openInCustomTab(articleLink)
         } else {
@@ -437,11 +476,11 @@ class FeedViewModel(
     }
 
     fun openArticleInBrowser(
-        itemId: Long,
+        itemId: ArticleKey,
         openInBrowser: (String) -> Unit,
         onNoArticleLink: () -> Unit,
     ) = viewModelScope.launch {
-        val articleLink = repository.getLink(itemId)
+        val articleLink = repository.articleLink(itemId)
         if (articleLink != null) {
             openInBrowser(articleLink)
         } else {
@@ -451,7 +490,7 @@ class FeedViewModel(
     }
 
     fun openArticleInReader(
-        itemId: Long,
+        itemId: ArticleKey,
         navigateToArticle: () -> Unit,
     ) {
         setCurrentArticle(itemId)
@@ -510,7 +549,7 @@ class FeedViewModel(
                 showFab = haveVisibleFeedItems && (params[0] as Boolean),
                 showThumbnails = params[1] as Boolean,
                 currentTheme = params[2] as ThemeOptions,
-                currentlySyncing = (params[26] as Boolean) && (params[3] as Boolean),
+                currentlySyncing = (repository.isMinifluxMain || params[26] as Boolean) && (params[3] as Boolean),
                 feedItemStyle = params[4] as FeedItemStyle,
                 expandedTags = params[5] as Set<String>,
                 showToolbarMenu = params[6] as Boolean,
@@ -586,6 +625,10 @@ class FeedViewModel(
     }
 
     fun ttsPlay() {
+        if (repository.isMinifluxMain) {
+            localOnly {}
+            return
+        }
         podcastPlayerStateHolder.stop()
         viewModelScope.launch(Dispatchers.IO) {
             val article =
@@ -749,7 +792,7 @@ class TranslatedFeedCards internal constructor(
     private val items: Map<FeedCardSource, FeedListItem> = emptyMap(),
 ) {
     fun merge(item: FeedListItem): FeedListItem =
-        items[FeedCardSource.from(item)]?.let { translatedItem ->
+        (if (item.articleKey.isMiniflux) null else items[FeedCardSource.from(item)])?.let { translatedItem ->
             item.copy(
                 title = translatedItem.title.ifBlank { item.title },
                 snippet = translatedItem.snippet.ifBlank { item.snippet },

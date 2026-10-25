@@ -48,6 +48,11 @@ import java.util.Locale
 
 val archModelModule =
     DI.Module(name = "arch models") {
+        bind<com.nononsenseapps.feeder.miniflux.MinifluxMainSource>() with
+            singleton {
+                com.nononsenseapps.feeder.miniflux
+                    .MinifluxMainSource(instance(), instance())
+            }
         bind<Repository>() with singleton { Repository(di) }
         bind<SessionStore>() with singleton { SessionStore() }
         bind<SettingsStore>() with singleton { SettingsStore(di) }

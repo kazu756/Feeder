@@ -44,6 +44,9 @@ class RepositoryTest : DIAware {
     private val repository: Repository by instance()
 
     @MockK
+    private lateinit var backendModeStore: BackendModeStore
+
+    @MockK
     private lateinit var feedItemStore: FeedItemStore
 
     @MockK
@@ -71,6 +74,7 @@ class RepositoryTest : DIAware {
     private lateinit var syncRestClient: SyncRestClient
 
     override val di by DI.lazy {
+        bind<BackendModeStore>() with instance(backendModeStore)
         bind<Repository>() with singleton { spyk(Repository(di)) }
         bind<FeedItemStore>() with instance(feedItemStore)
         bind<SettingsStore>() with instance(settingsStore)
@@ -88,6 +92,7 @@ class RepositoryTest : DIAware {
     fun setup() {
         MockKAnnotations.init(this, relaxUnitFun = true, relaxed = true)
 
+        every { backendModeStore.selection } returns MutableStateFlow(BackendSelection())
         every { settingsStore.syncOnlyWhenCharging } returns MutableStateFlow(false)
         every { settingsStore.syncOnlyOnWifi } returns MutableStateFlow(false)
         every { settingsStore.addedFeederNews } returns MutableStateFlow(true)
@@ -429,7 +434,7 @@ class RepositoryTest : DIAware {
 
         val result =
             runBlocking {
-                repository.currentlySyncing.toList()
+                listOf(repository.currentlySyncing.first())
             }
 
         assertEquals(1, result.size)

@@ -26,6 +26,13 @@ import com.nononsenseapps.feeder.db.room.ID_UNSET
 import com.nononsenseapps.feeder.db.room.RemoteFeed
 import com.nononsenseapps.feeder.db.room.SyncDevice
 import com.nononsenseapps.feeder.db.room.SyncRemote
+import com.nononsenseapps.feeder.miniflux.MinifluxCacheStore
+import com.nononsenseapps.feeder.miniflux.MinifluxCredentialStore
+import com.nononsenseapps.feeder.miniflux.MinifluxMainSource
+import com.nononsenseapps.feeder.miniflux.MinifluxReadMutationStore
+import com.nononsenseapps.feeder.miniflux.MinifluxStarMutationStore
+import com.nononsenseapps.feeder.miniflux.MinifluxUnifiedOverall
+import com.nononsenseapps.feeder.miniflux.MinifluxUnifiedSync
 import com.nononsenseapps.feeder.model.FeedUnreadCount
 import com.nononsenseapps.feeder.model.PreviewItem
 import com.nononsenseapps.feeder.model.ThumbnailImage
@@ -42,13 +49,16 @@ import com.nononsenseapps.feeder.util.reportShortcutToFeedUsed
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.kodein.di.DI
@@ -64,6 +74,16 @@ class Repository(
 ) : DIAware {
     private val settingsStore: SettingsStore by instance()
     private val backendModeStore: BackendModeStore by instance()
+    private val minifluxMain: MinifluxMainSource by instance()
+    private val minifluxCache: MinifluxCacheStore by instance()
+    private val minifluxReads: MinifluxReadMutationStore by instance()
+    private val minifluxStars: MinifluxStarMutationStore by instance()
+    private val minifluxSync: MinifluxUnifiedSync by instance()
+    private val minifluxCredentials: MinifluxCredentialStore by instance()
+    val mainBackendError = MutableStateFlow<String?>(null)
+    val isMinifluxMain get() = backendSelection.value.mode == BackendMode.MINIFLUX
+    private val minifluxCollapsedCategories = MutableStateFlow<Set<String>>(emptySet())
+    private val minifluxFeedSelection = MutableStateFlow(Triple("", ID_ALL_FEEDS, ""))
     val backendSelection get() = backendModeStore.selection
     private val recentlyViewedStore: RecentlyViewedStore by instance()
     private val sessionStore: SessionStore by instance()
@@ -104,7 +124,19 @@ class Repository(
 
     fun setMinReadTime(value: Instant) = settingsStore.setMinReadTime(value)
 
-    val currentFeedAndTag: StateFlow<Pair<Long, String>> = settingsStore.currentFeedAndTag
+    val currentFeedAndTag: StateFlow<Pair<Long, String>> by lazy {
+        combine(backendSelection, settingsStore.currentFeedAndTag, minifluxFeedSelection) { backend, local, mini ->
+            if (backend.mode == BackendMode.LOCAL_RSS) {
+                local
+            } else if (backend.minifluxProfileId == mini.first) {
+                mini.second to mini.third
+            } else {
+                ID_ALL_FEEDS to ""
+            }
+        }.stateIn(applicationCoroutineScope, SharingStarted.Eagerly, if (isMinifluxMain) ID_ALL_FEEDS to "" else settingsStore.currentFeedAndTag.value)
+    }
+
+    fun localMainSelection(): Pair<Long, String> = settingsStore.currentFeedAndTag.value
 
     val currentWidgetFeedAndTag: StateFlow<Pair<Long, String>> = settingsStore.currentWidgetFeedAndTag
 
@@ -123,6 +155,10 @@ class Repository(
         feedId: Long,
         tag: String,
     ) {
+        if (isMinifluxMain) {
+            minifluxFeedSelection.value = Triple(checkNotNull(backendSelection.value.minifluxProfileId), feedId, tag)
+            return
+        }
         if (feedId > ID_UNSET) {
             applicationCoroutineScope.launch {
                 application.apply {
@@ -219,6 +255,116 @@ class Repository(
         feedItemStore
             .getFeedItem(itemId)
             .map { Article(it) }
+
+    fun getArticleFlow(key: ArticleKey): Flow<Article?> =
+        if (key.isMiniflux) {
+            minifluxMain.article(key).catch {
+                mainBackendError.value = "Miniflux cache unavailable"
+                emit(Article(null))
+            }
+        } else {
+            getArticleFlow(key.localId)
+        }
+
+    suspend fun markArticle(
+        key: ArticleKey,
+        unread: Boolean,
+    ) {
+        if (key.isMiniflux) {
+            minifluxAction {
+                val profile = checkNotNull(key.profileId)
+                val identity = minifluxCache.existingDatabase(profile).cacheDao().identityForLocal(key.localId) ?: return@minifluxAction
+                check(identity.profileId == profile)
+                minifluxReads.setStatus(profile, identity.remoteEntryId, if (unread) "unread" else "read")
+            }
+        } else if (unread) {
+            markAsUnread(key.localId)
+        } else {
+            markAsReadAndNotified(key.localId)
+        }
+    }
+
+    suspend fun bookmarkArticle(
+        key: ArticleKey,
+        starred: Boolean,
+    ) {
+        if (key.isMiniflux) {
+            minifluxAction {
+                val profile = checkNotNull(key.profileId)
+                val identity = minifluxCache.existingDatabase(profile).cacheDao().identityForLocal(key.localId) ?: return@minifluxAction
+                check(identity.profileId == profile)
+                minifluxStars.setStarred(profile, identity.remoteEntryId, starred)
+            }
+        } else {
+            setBookmarked(key.localId, starred)
+        }
+    }
+
+    private suspend fun minifluxAction(action: suspend () -> Unit) {
+        try {
+            action()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            mainBackendError.value = "Miniflux cache operation failed"
+        }
+    }
+
+    suspend fun articleLink(key: ArticleKey): String? =
+        if (key.isMiniflux) {
+            minifluxCache
+                .existingDatabase(checkNotNull(key.profileId))
+                .cacheDao()
+                .item(key.localId)
+                ?.link
+        } else {
+            getLink(key.localId)
+        }
+
+    suspend fun minifluxBody(key: ArticleKey): String? =
+        try {
+            minifluxCache.existingDatabase(checkNotNull(key.profileId))
+            minifluxCache.readBody(key.profileId, key.localId)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+
+    fun refreshMinifluxMain() {
+        if (minifluxSync.busy.value) return
+        val profileId = backendSelection.value.minifluxProfileId ?: return
+        applicationCoroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val profile = minifluxCache.existingDatabase(profileId).cacheDao().profile() ?: error("Missing profile")
+                val token = minifluxCredentials.loadToken(profile.baseUrl) ?: error("Missing token")
+                val result = minifluxSync.syncPinned(profile.baseUrl, token, profileId)
+                if (result.errorType == "ALREADY_RUNNING") return@launch
+                mainBackendError.value =
+                    if (result.overall in setOf(MinifluxUnifiedOverall.SUCCESS, MinifluxUnifiedOverall.NOTHING_TO_DO)) null else "Miniflux sync: ${result.errorType ?: result.overall.name}"
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                mainBackendError.value = "Miniflux sync failed; cached articles retained"
+            }
+        }
+    }
+
+    fun markMainSelection(
+        cursor: FeedItemCursor? = null,
+        before: Boolean = true,
+    ) {
+        val key = (cursor as? ArticleCursor)?.articleKey
+        val profile = key?.profileId ?: backendSelection.value.minifluxProfileId ?: return
+        val selected = minifluxFeedSelection.value
+        val (feed, tag) = if (selected.first == profile) selected.second to selected.third else ID_ALL_FEEDS to ""
+        val filter = feedListFilter.value
+        val query = search.value
+        val newest = currentSorting.value == SortingOptions.NEWEST_FIRST
+        applicationCoroutineScope.launch {
+            minifluxAction { minifluxMain.markSelection(profile, feed, tag, filter, query, cursor, before, newest) { markArticle(it, false) } }
+        }
+    }
 
     val currentTheme: StateFlow<ThemeOptions> = settingsStore.currentTheme
 
@@ -412,7 +558,7 @@ class Repository(
     /**
      * Returns true if the latest sync timestamp is within the last 10 seconds
      */
-    val currentlySyncing: Flow<Boolean>
+    private val localCurrentlySyncing: Flow<Boolean>
         get() =
             feedStore
                 .getCurrentlySyncingLatestTimestamp()
@@ -420,9 +566,77 @@ class Repository(
                     (value ?: Instant.EPOCH).isAfter(Instant.now().minusSeconds(10))
                 }.distinctUntilChanged()
 
-    @OptIn(ExperimentalCoroutinesApi::class)
+    val currentlySyncing: Flow<Boolean> get() = mainRoute({ localCurrentlySyncing }) { minifluxSync.busy }
+
+    private fun <T> mainRoute(
+        local: () -> Flow<T>,
+        remote: (String) -> Flow<T>,
+    ): Flow<T> =
+        backendSelection.flatMapLatest { backend ->
+            if (backend.mode == BackendMode.LOCAL_RSS) local() else remote(checkNotNull(backend.minifluxProfileId))
+        }
+
+    private fun minifluxSelection(profile: String): Flow<Pair<Long, String>> = minifluxFeedSelection.map { if (it.first == profile) it.second to it.third else ID_ALL_FEEDS to "" }
+
     fun getCurrentFeedListItems(): Flow<PagingData<FeedListItem>> =
-        currentFeedAndTag.flatMapLatest { (feedId, tag) ->
+        mainRoute(::localGetCurrentFeedListItems) { profile ->
+            combine(minifluxSelection(profile), currentSorting, feedListFilter, search) { selection, sort, filter, query ->
+                FeedListArgs(selection.first, selection.second, sort == SortingOptions.NEWEST_FIRST, Instant.EPOCH, filter, query)
+            }.flatMapLatest { minifluxMain.articles(profile, it.feedId, it.tag, it.filter, it.search, it.newestFirst) }
+                .catch {
+                    mainBackendError.value = "Miniflux cache unavailable"
+                    emit(PagingData.empty())
+                }
+        }
+
+    fun getCurrentFeedListVisibleItemCount(): Flow<Int> =
+        mainRoute(::localGetCurrentFeedListVisibleItemCount) { profile ->
+            combine(minifluxSelection(profile), feedListFilter, search) { selection, filter, query -> Triple(selection, filter, query) }
+                .flatMapLatest { (selection, filter, query) -> minifluxMain.count(profile, selection.first, selection.second, filter, query) }
+                .catch {
+                    mainBackendError.value = "Miniflux cache unavailable"
+                    emit(0)
+                }
+        }
+
+    fun getPagedNavDrawerItems(): Flow<PagingData<FeedUnreadCount>> =
+        mainRoute(::localGetPagedNavDrawerItems) { profile ->
+            combine(minifluxMain.drawer(profile), minifluxCollapsedCategories) { rows, collapsed ->
+                PagingData.from(rows.filter { it.id <= ID_UNSET || it.tag !in collapsed }.map { if (it.id == ID_UNSET) it.copy(expanded = it.tag !in collapsed) else it })
+            }.catch {
+                mainBackendError.value = "Miniflux cache unavailable"
+                emit(PagingData.empty())
+            }
+        }
+
+    fun getScreenTitleForCurrentFeedOrTag(): Flow<ScreenTitle> =
+        mainRoute(::localGetScreenTitleForCurrentFeedOrTag) { profile ->
+            minifluxSelection(profile)
+                .flatMapLatest { (feed, tag) ->
+                    combine(minifluxMain.drawer(profile), minifluxMain.count(profile, feed, tag)) { rows, count ->
+                        val row = if (feed > ID_UNSET) rows.firstOrNull { it.id == feed } else rows.firstOrNull { it.id == ID_UNSET && it.tag == tag }
+                        ScreenTitle(
+                            row?.displayTitle ?: "Miniflux",
+                            when {
+                                feed == ID_SAVED_ARTICLES -> FeedType.SAVED_ARTICLES
+                                feed > ID_UNSET -> FeedType.FEED
+                                tag.isNotBlank() -> FeedType.TAG
+                                else -> FeedType.ALL_FEEDS
+                            },
+                            count,
+                        )
+                    }
+                }.catch {
+                    mainBackendError.value = "Miniflux cache unavailable"
+                    emit(ScreenTitle("Miniflux", FeedType.ALL_FEEDS, 0))
+                }
+        }
+
+    fun getCurrentlyVisibleFeedTitles(): Flow<List<FeedTitle>> = mainRoute(::localGetCurrentlyVisibleFeedTitles) { flowOf(emptyList()) }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun localGetCurrentFeedListItems(): Flow<PagingData<FeedListItem>> =
+        settingsStore.currentFeedAndTag.flatMapLatest { (feedId, tag) ->
             if (feedId == ID_RECENTLY_VIEWED_ARTICLES) {
                 recentlyViewedStore.articleIds.flatMapLatest { articleIds ->
                     feedItemStore
@@ -464,8 +678,8 @@ class Repository(
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun getCurrentFeedListVisibleItemCount(): Flow<Int> =
-        currentFeedAndTag.flatMapLatest { (feedId, tag) ->
+    private fun localGetCurrentFeedListVisibleItemCount(): Flow<Int> =
+        settingsStore.currentFeedAndTag.flatMapLatest { (feedId, tag) ->
             if (feedId == ID_RECENTLY_VIEWED_ARTICLES) {
                 recentlyViewedStore.articleIds.flatMapLatest { articleIds ->
                     feedItemStore.getFeedItemsByIds(articleIds).map { it.size }
@@ -589,8 +803,8 @@ class Repository(
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun getScreenTitleForCurrentFeedOrTag(): Flow<ScreenTitle> =
-        currentFeedAndTag.flatMapLatest { (feedId, tag) ->
+    private fun localGetScreenTitleForCurrentFeedOrTag(): Flow<ScreenTitle> =
+        settingsStore.currentFeedAndTag.flatMapLatest { (feedId, tag) ->
             if (feedId == ID_RECENTLY_VIEWED_ARTICLES) {
                 recentlyViewedScreenTitle()
             } else {
@@ -683,7 +897,7 @@ class Repository(
 
     val allTags: Flow<List<String>> = feedStore.allTags
 
-    fun getPagedNavDrawerItems(): Flow<PagingData<FeedUnreadCount>> =
+    private fun localGetPagedNavDrawerItems(): Flow<PagingData<FeedUnreadCount>> =
         expandedTags
             .flatMapLatest {
                 feedStore.getPagedNavDrawerItems(it)
@@ -708,8 +922,8 @@ class Repository(
             )
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun getCurrentlyVisibleFeedTitles(): Flow<List<FeedTitle>> =
-        currentFeedAndTag.flatMapLatest { (feedId, tag) ->
+    private fun localGetCurrentlyVisibleFeedTitles(): Flow<List<FeedTitle>> =
+        settingsStore.currentFeedAndTag.flatMapLatest { (feedId, tag) ->
             if (feedId == ID_RECENTLY_VIEWED_ARTICLES) {
                 flowOf(emptyList())
             } else {
@@ -719,7 +933,9 @@ class Repository(
 
     val expandedTags: StateFlow<Set<String>> = sessionStore.expandedTags
 
-    fun toggleTagExpansion(tag: String) = sessionStore.toggleTagExpansion(tag)
+    fun toggleTagExpansion(tag: String) {
+        if (isMinifluxMain) minifluxCollapsedCategories.update { if (tag in it) it - tag else it + tag } else sessionStore.toggleTagExpansion(tag)
+    }
 
     fun ensurePeriodicSyncConfigured() {
         schedulePeriodicRssSync(di = di, replace = false)
@@ -1001,6 +1217,7 @@ val Enclosure.isImage: Boolean
 @Immutable
 data class Article(
     val item: FeedItemWithFeed?,
+    val contentRevision: String? = null,
 ) {
     val id: Long = item?.id ?: ID_UNSET
     val link: String? = item?.link

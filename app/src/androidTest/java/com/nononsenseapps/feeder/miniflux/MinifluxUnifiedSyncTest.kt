@@ -27,6 +27,9 @@ import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.kodein.di.bind
+import org.kodein.di.instance
+import org.kodein.di.singleton
 import java.io.File
 import java.time.Instant
 import java.util.UUID
@@ -756,6 +759,130 @@ class MinifluxUnifiedSyncTest {
             owner.cancelAndJoin()
             assertTrue(withTimeout(5000) { individual.await() }.complete)
             assertMutationScope()
+        }
+
+    @Test fun sharedUnifiedEntryRejectsDuplicateMainAndSettingsRefresh() =
+        runBlocking<Unit> {
+            val profile = prepare()
+            stallReconciliation = true
+            val slow = MinifluxApiClient(OkHttpClient.Builder().readTimeout(20, TimeUnit.SECONDS).build())
+            val unified = coordinator(slow)
+            val owner = async(Dispatchers.IO) { unified.sync(profile.baseUrl, "fixture-token") { currentStage = it.stage } }
+            withTimeout(5000) { while (reconciliationLists.get() == 0) delay(10) }
+            assertTrue(unified.busy.value)
+            val count = requests.size
+            assertEquals("ALREADY_RUNNING", unified.syncPinned(profile.baseUrl, "fixture-token", profile.id).errorType)
+            assertEquals(count, requests.size)
+            owner.cancelAndJoin()
+            assertFalse(unified.busy.value)
+        }
+
+    @Test fun pinnedMainRefreshRejectsChangedAccountBeforePreparingOrSendingPending() =
+        runBlocking<Unit> {
+            val profile = prepare()
+            MinifluxReadMutationStore(cache).setStatus(profile.id, 9000, "read")
+            val before = cache.database(profile.id).cacheDao().profile()
+            val result = coordinator().syncPinned(profile.baseUrl, "fixture-token", "a".repeat(64))
+            assertEquals(MinifluxUnifiedOverall.FAILED, result.overall)
+            assertEquals(before, cache.database(profile.id).cacheDao().profile())
+            assertEquals(
+                1,
+                cache
+                    .database(profile.id)
+                    .cacheDao()
+                    .pending(profile.id)
+                    .size,
+            )
+            assertTrue(requests.all { it.method == "GET" && it.requestUrl!!.encodedPath == "/v1/me" })
+        }
+
+    @Test fun mainRefreshUsesExistingUnifiedEntryAndRetainsCacheAndPendingOnFailure() =
+        runBlocking<Unit> {
+            val profile = prepare()
+            val prefs = app.getSharedPreferences("main_refresh_$suffix", 0)
+            val modes =
+                com.nononsenseapps.feeder.archmodel
+                    .BackendModeStore(prefs)
+            modes.commit(
+                com.nononsenseapps.feeder.archmodel
+                    .BackendSelection(com.nononsenseapps.feeder.archmodel.BackendMode.MINIFLUX, profile.id),
+            )
+            val credentials = MinifluxCredentialStore(context, "main_refresh_$suffix", "main_refresh_$suffix")
+            val fixtureScope = com.nononsenseapps.feeder.ApplicationCoroutineScope()
+            val unified = coordinator()
+            val source = MinifluxMainSource(cache, app as android.app.Application)
+            val testDi =
+                org.kodein.di.DI {
+                    extend((app as com.nononsenseapps.feeder.FeederApplication).di)
+                    bind<android.content.SharedPreferences>(overrides = true) with instance(prefs)
+                    bind<com.nononsenseapps.feeder.archmodel.BackendModeStore>(overrides = true) with instance(modes)
+                    bind<MinifluxCacheStore>(overrides = true) with instance(cache)
+                    bind<MinifluxCredentialStore>(overrides = true) with instance(credentials)
+                    bind<MinifluxUnifiedSync>(overrides = true) with instance(unified)
+                    bind<MinifluxMainSource>(overrides = true) with instance(source)
+                    bind<com.nononsenseapps.feeder.ApplicationCoroutineScope>(overrides = true) with instance(fixtureScope)
+                    bind<com.nononsenseapps.feeder.archmodel.SettingsStore>(overrides = true) with
+                        singleton {
+                            com.nononsenseapps.feeder.archmodel
+                                .SettingsStore(di)
+                                .also {
+                                    it.setAddedFeederNews(true)
+                                    it.setFeedListFilterRead(false)
+                                    it.setFeedListFilterRecentlyRead(false)
+                                }
+                        }
+                }
+            val repository =
+                com.nononsenseapps.feeder.archmodel
+                    .Repository(testDi)
+            try {
+                credentials.saveToken(profile.baseUrl, "fixture-token")
+                rows = listOf(entry().copy(title = "Main updated", status = "read", starred = true))
+                repository.refreshMinifluxMain()
+                withTimeout(10000) { while (requests.isEmpty() || unified.busy.value) delay(10) }
+                val local =
+                    cache
+                        .database(profile.id)
+                        .cacheDao()
+                        .entryIdentity(profile.id, 9000)!!
+                        .localFeedItemId
+                val key =
+                    com.nononsenseapps.feeder.archmodel
+                        .ArticleKey(local, profile.id)
+                assertEquals("Main updated", source.article(key).first()!!.title)
+                assertTrue(source.article(key).first()!!.bookmarked)
+                assertEquals(0, repository.getCurrentFeedListVisibleItemCount().first())
+                MinifluxReadMutationStore(cache).setStatus(profile.id, 9000, "unread")
+                mutations().setStarred(profile.id, 9000, false)
+                val before = cache.database(profile.id).cacheDao().profile()
+                accountCode = 401
+                val count = requests.size
+                repository.refreshMinifluxMain()
+                withTimeout(10000) { while (requests.size == count || unified.busy.value) delay(10) }
+                assertEquals("Main updated", source.article(key).first()!!.title)
+                assertEquals(1, repository.getCurrentFeedListVisibleItemCount().first())
+                assertEquals(
+                    1,
+                    cache
+                        .database(profile.id)
+                        .cacheDao()
+                        .pending(profile.id)
+                        .size,
+                )
+                assertEquals(
+                    1,
+                    cache
+                        .database(profile.id)
+                        .cacheDao()
+                        .starPending(profile.id)
+                        .size,
+                )
+                assertEquals(before, cache.database(profile.id).cacheDao().profile())
+            } finally {
+                fixtureScope.cancel()
+                credentials.clearToken()
+                prefs.edit().clear().commit()
+            }
         }
 
     @After fun cleanupFixture() {

@@ -107,6 +107,26 @@ data class MinifluxReadOutbox(
 
 @Dao
 interface MinifluxCacheDao {
+    @androidx.room.RawQuery(observedEntities = [FeedItem::class, Feed::class, MinifluxEntryIdentity::class, MinifluxFeedIdentity::class, MinifluxReadOutbox::class, MinifluxStarOutbox::class])
+    fun mainPreviews(query: androidx.sqlite.db.SupportSQLiteQuery): androidx.paging.PagingSource<Int, com.nononsenseapps.feeder.model.PreviewItem>
+
+    @androidx.room.RawQuery(observedEntities = [FeedItem::class, MinifluxEntryIdentity::class, MinifluxFeedIdentity::class, MinifluxReadOutbox::class, MinifluxStarOutbox::class])
+    fun mainCount(query: androidx.sqlite.db.SupportSQLiteQuery): Flow<Int>
+
+    @androidx.room.RawQuery(observedEntities = [FeedItem::class, Feed::class, MinifluxEntryIdentity::class, MinifluxReadOutbox::class, MinifluxStarOutbox::class])
+    fun mainArticle(query: androidx.sqlite.db.SupportSQLiteQuery): Flow<MinifluxMainArticle?>
+
+    @androidx.room.RawQuery(
+        observedEntities = [
+            FeedItem::class, Feed::class, MinifluxCachedCategory::class, MinifluxFeedIdentity::class,
+            MinifluxEntryIdentity::class, MinifluxReadOutbox::class, MinifluxStarOutbox::class,
+        ],
+    )
+    fun mainDrawer(query: androidx.sqlite.db.SupportSQLiteQuery): Flow<List<com.nononsenseapps.feeder.model.FeedUnreadCount>>
+
+    @androidx.room.RawQuery
+    suspend fun mainIds(query: androidx.sqlite.db.SupportSQLiteQuery): List<Long>
+
     @Query("SELECT * FROM miniflux_star_outbox WHERE profileId=:profile ORDER BY updatedAt, remoteEntryId")
     suspend fun starPending(profile: String): List<MinifluxStarOutbox>
 
@@ -299,6 +319,12 @@ interface MinifluxCacheDao {
         hash: String,
     )
 }
+
+/** Including the body revision makes StateFlow notify an open Reader even when text metadata is unchanged. */
+data class MinifluxMainArticle(
+    @androidx.room.Embedded val item: com.nononsenseapps.feeder.db.room.FeedItemWithFeed,
+    val contentRevision: String,
+)
 
 data class MinifluxCachedChangeTime(
     val changedAt: String?,

@@ -210,7 +210,7 @@ fun ListOfFeedsAndTags(
                             expanded = item.expanded,
                             onToggleExpansion = onToggleTagExpansion,
                             unreadCount = item.unreadCount,
-                            title = item.tag,
+                            title = item.displayTitle.ifBlank { item.tag },
                             onItemClick = {
                                 onItemClick(item)
                             },

@@ -373,10 +373,10 @@
     <string name="backend_local">FeederD（従来方式）</string>
     <string name="backend_miniflux">Miniflux（試験的）</string>
     <string name="backend_local_description">FeederDは、この端末でRSSを取得します。</string>
-    <string name="backend_foundation_note">Minifluxを記事・既読・スター状態の基準として利用するための設定です。現在は切替基盤のみです。メイン画面とバックグラウンドRSS取得は、まだ従来方式です。</string>
+    <string name="backend_foundation_note">Minifluxモードでは通常画面にキャッシュ記事を表示します。この段階ではRSSバックグラウンド取得・Sync Chainは継続します。購読管理・Reader追加機能はLocal RSSモードで利用してください。</string>
     <string name="backend_checking">確認中…</string>
     <string name="backend_confirm_title">記事の取得元の設定を変更しますか？</string>
-    <string name="backend_confirm_miniflux">接続とキャッシュを読み取り専用で確認してから、Minifluxを記事取得元として使用する設定に切り替えます。通常RSSデータ・Minifluxキャッシュ・同期待ちは保持します。この段階ではメイン画面とRSSバックグラウンド処理も、まだ従来方式です。</string>
+    <string name="backend_confirm_miniflux">接続とキャッシュを確認し、通常画面をMinifluxへ切り替えます。既存RSSデータ・Minifluxキャッシュ・送信待ちは保持されます。RSSバックグラウンド処理は継続します。</string>
     <string name="backend_confirm_local">FeederDの設定へ戻します。Minifluxキャッシュと同期待ちは保持します。</string>
     <string name="backend_use_miniflux">Minifluxに切り替える</string>
     <string name="backend_use_local">FeederDに戻す</string>
@@ -389,4 +389,5 @@
     <string name="backend_storage_error">設定を保存できませんでした。現在のmodeを維持しています。</string>
     <string name="backend_busy">別の記事取得元の切替を確認中です。</string>
     <string name="backend_cancelled">キャンセルしました。現在の設定を維持しています。</string>
+    <string name="miniflux_main_local_only">この機能はLocal RSSモードで利用できます。Minifluxの購読管理・Reader追加機能は未対応です。</string>
 </resources>

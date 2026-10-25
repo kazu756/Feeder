@@ -21,6 +21,17 @@ class NavigationDeepLinkViewModel(
         repository.setIsArticleOpen(false)
     }
 
+    fun readerMatchesMain(profile: String?): Boolean = if (profile == null) !repository.isMinifluxMain else repository.isMinifluxMain && repository.backendSelection.value.minifluxProfileId == profile
+
+    fun openArticle(key: com.nononsenseapps.feeder.archmodel.ArticleKey) {
+        if (!key.isMiniflux) {
+            setCurrentArticle(key.localId)
+            return
+        }
+        viewModelScope.launch { repository.markArticle(key, false) }
+        repository.setIsArticleOpen(true)
+    }
+
     fun setCurrentArticle(itemId: Long) {
         repository.recordRecentlyViewedArticle(itemId)
         viewModelScope.launch {

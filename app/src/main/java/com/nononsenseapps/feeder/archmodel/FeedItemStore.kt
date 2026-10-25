@@ -382,7 +382,7 @@ internal fun <T> orderByArticleIds(
     return articleIds.mapNotNull(itemsById::get)
 }
 
-private fun PreviewItem.toFeedListItem(context: Context) =
+internal fun PreviewItem.toFeedListItem(context: Context) =
     FeedListItem(
         id = id,
         title = plainTitle,
