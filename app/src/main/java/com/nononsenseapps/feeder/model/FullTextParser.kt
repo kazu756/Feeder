@@ -33,6 +33,8 @@ class FullTextParser(
     private val filePathProvider: FilePathProvider by instance()
 
     suspend fun parseFullArticlesForMissing(): Boolean {
+        val backend: com.nononsenseapps.feeder.background.BackendSyncCoordinator by instance()
+        if (!backend.allowsLocalRss()) return false
         logDebug(LOG_TAG, "Parsing full texts for missing")
         val itemsToSync: List<FeedItemForFetching> =
             repository

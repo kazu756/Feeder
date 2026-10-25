@@ -173,17 +173,21 @@ class FeedWidget : GlanceAppWidget() {
         val widgetStateFlow = buildWidgetStateFlow(app, context)
 
         provideContent {
+            val modes: com.nononsenseapps.feeder.archmodel.BackendModeStore by app.di.instance()
+            val selection by modes.selection.collectAsState()
+            val localOnlyNotice = selection.mode == com.nononsenseapps.feeder.archmodel.BackendMode.MINIFLUX
             val widgetState by widgetStateFlow.collectAsState(initial = WidgetState.Syncing)
             val coroutineScope = rememberCoroutineScope()
             val runSync = {
                 val rssLocalSync by app.di.instance<RssLocalSync>()
-                coroutineScope.launch { rssLocalSync.syncFeeds() }
+                if (!localOnlyNotice) coroutineScope.launch { rssLocalSync.syncFeeds() }
                 Unit
             }
             GlanceTheme(colors = FeederWidgetGlanceColorScheme.colors) {
                 WidgetContent(
                     widgetState = widgetState,
                     runSync = runSync,
+                    localOnlyNotice = localOnlyNotice,
                 )
             }
         }
@@ -193,6 +197,7 @@ class FeedWidget : GlanceAppWidget() {
     private fun WidgetContent(
         widgetState: WidgetState,
         runSync: () -> Unit,
+        localOnlyNotice: Boolean = false,
     ) {
         Column(
             modifier =
@@ -202,6 +207,7 @@ class FeedWidget : GlanceAppWidget() {
                     .padding(4.dp),
         ) {
             FeederTitleBar(runSync)
+            if (localOnlyNotice) Text(LocalContext.current.getString(R.string.widget_local_rss_only))
             when (widgetState) {
                 is WidgetState.Syncing -> WidgetSyncingContent()
                 is WidgetState.Ready -> WidgetReadyContent(widgetState.items)

@@ -27,6 +27,7 @@ import java.time.Instant
 class SyncRestClient(
     override val di: DI,
 ) : DIAware {
+    private val backendSync: com.nononsenseapps.feeder.background.BackendSyncCoordinator by instance()
     private val repository: Repository by instance()
     private val okHttpClient: OkHttpClient by instance()
     private var feederSync: FeederSync? = null
@@ -78,25 +79,17 @@ class SyncRestClient(
         }
     }
 
-    private suspend fun <A> safeBlock(block: suspend (SyncRemote, FeederSync, SecretKeys) -> Either<ErrorResponse, A>): Either<ErrorResponse, A> {
-        repository.getSyncRemote().let { syncRemote ->
-            if (syncRemote.hasSyncChain()) {
-                feederSync?.let { feederSync ->
-                    secretKey?.let { secretKey ->
-                        return block(syncRemote, feederSync, secretKey)
-                    }
-                }
-            }
+    private suspend fun <A> safeBlock(block: suspend (SyncRemote, FeederSync, SecretKeys) -> Either<ErrorResponse, A>): Either<ErrorResponse, A> =
+        backendSync.withCurrentRun { selected ->
+            if (selected.mode != com.nononsenseapps.feeder.archmodel.BackendMode.LOCAL_RSS) return@withCurrentRun Either.Left(ErrorResponse(1002, null))
+            val remote = repository.getSyncRemote()
+            val api = feederSync
+            val key = secretKey
+            if (remote.hasSyncChain() && api != null && key != null) block(remote, api, key) else Either.Left(ErrorResponse(1001, null))
         }
-        return Either.Left(
-            ErrorResponse(
-                code = 1001,
-                body = null,
-            ),
-        )
-    }
 
     suspend fun create(): Either<ErrorResponse, String> {
+        if (!backendSync.allowsLocalRss()) return Either.Left(ErrorResponse(1002, null))
         logDebug(LOG_TAG, "create")
         // To ensure always uses correct client, manually set remote here ALWAYS
         val syncRemote = repository.getSyncRemote()
@@ -137,6 +130,7 @@ class SyncRestClient(
         syncCode: String,
         remoteSecretKey: String,
     ): Either<ErrorResponse, String> {
+        if (!backendSync.allowsLocalRss()) return Either.Left(ErrorResponse(1002, null))
         logDebug(LOG_TAG, "join")
         try {
             logDebug(LOG_TAG, "Really joining")

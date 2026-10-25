@@ -445,7 +445,7 @@ class ArticleViewModel(
                             null
                         },
                     loadRss = {
-                        if (!blobFile(article.id, filePathProvider.articleDir).isFile) {
+                        if (!repository.isMinifluxMain && !blobFile(article.id, filePathProvider.articleDir).isFile) {
                             runOnceRssSync(
                                 di = di,
                                 feedId = article.feedId,

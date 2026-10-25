@@ -819,6 +819,12 @@ class MinifluxUnifiedSyncTest {
                     bind<MinifluxCacheStore>(overrides = true) with instance(cache)
                     bind<MinifluxCredentialStore>(overrides = true) with instance(credentials)
                     bind<MinifluxUnifiedSync>(overrides = true) with instance(unified)
+                    bind<com.nononsenseapps.feeder.background.BackendSyncCoordinator>(overrides = true) with
+                        singleton {
+                            com.nononsenseapps.feeder.background
+                                .BackendSyncCoordinator { modes.selection.value }
+                        }
+                    bind<MinifluxSyncRunner>(overrides = true) with singleton { MinifluxSyncRunner(instance(), cache, credentials, unified) }
                     bind<MinifluxMainSource>(overrides = true) with instance(source)
                     bind<com.nononsenseapps.feeder.ApplicationCoroutineScope>(overrides = true) with instance(fixtureScope)
                     bind<com.nononsenseapps.feeder.archmodel.SettingsStore>(overrides = true) with
@@ -882,6 +888,94 @@ class MinifluxUnifiedSyncTest {
                 fixtureScope.cancel()
                 credentials.clearToken()
                 prefs.edit().clear().commit()
+            }
+        }
+
+    @Test fun scheduledMinifluxPipelineSendsOutboxesFetchesAndReconcilesWithoutRssOrCleanup() =
+        runBlocking<Unit> {
+            val profile = prepare()
+            pending(profile)
+            val modes =
+                com.nononsenseapps.feeder.archmodel
+                    .BackendSelection(com.nononsenseapps.feeder.archmodel.BackendMode.MINIFLUX, profile.id)
+            val backend =
+                com.nononsenseapps.feeder.background
+                    .BackendSyncCoordinator { modes }
+            val credentials = MinifluxCredentialStore(context, "background_$suffix", "background_$suffix")
+            val unified = coordinator()
+            val runner = MinifluxSyncRunner(backend, cache, credentials, unified)
+            val dispatcher =
+                com.nononsenseapps.feeder.background
+                    .BackendSyncDispatcher(backend, runner)
+            try {
+                credentials.saveToken(profile.baseUrl, "fixture-token")
+                dispatcher.sync(modes) { error("RSS must not run") }
+                val dao = cache.database(profile.id).cacheDao()
+                assertEquals(0, dao.pending(profile.id).size)
+                assertEquals(0, dao.starPending(profile.id).size)
+                assertEquals(1, dao.entryCount())
+                assertEquals(1, dao.feedCount())
+                assertTrue(requests.any { it.requestUrl!!.encodedPath == "/v1/entries/ids" })
+                assertTrue(putBodies.any { it.contains("status") })
+                assertTrue(putBodies.any { it.contains("starred") })
+                assertMutationScope()
+                assertFalse(unified.busy.value)
+                assertEquals(
+                    4,
+                    cache
+                        .database(profile.id)
+                        .openHelper.readableDatabase.version,
+                )
+            } finally {
+                credentials.clearToken()
+            }
+        }
+
+    @Test fun backgroundFailureAndCancellationKeepCachePendingAndCheckpointAndReleaseLocks() =
+        runBlocking<Unit> {
+            val profile = prepare()
+            pending(profile)
+            val modes =
+                com.nononsenseapps.feeder.archmodel
+                    .BackendSelection(com.nononsenseapps.feeder.archmodel.BackendMode.MINIFLUX, profile.id)
+            val backend =
+                com.nononsenseapps.feeder.background
+                    .BackendSyncCoordinator { modes }
+            val credentials = MinifluxCredentialStore(context, "background_failure_$suffix", "background_failure_$suffix")
+            val unified = coordinator()
+            val runner = MinifluxSyncRunner(backend, cache, credentials, unified, 1000)
+            try {
+                credentials.saveToken(profile.baseUrl, "fixture-token")
+                val dao = cache.database(profile.id).cacheDao()
+                val before = dao.profile()
+                for (code in listOf(401, 500)) {
+                    accountCode = code
+                    val result = runner.sync(modes)
+                    assertEquals(MinifluxUnifiedOverall.FAILED, result.overall)
+                    assertEquals(1, dao.pending(profile.id).size)
+                    assertEquals(1, dao.starPending(profile.id).size)
+                    assertEquals(before, dao.profile())
+                }
+                accountCode = 200
+                stallPut = true
+                applyPut = false
+                val slow = MinifluxApiClient(OkHttpClient.Builder().readTimeout(20, TimeUnit.SECONDS).build())
+                val blocked = coordinator(slow)
+                val bounded = MinifluxSyncRunner(backend, cache, credentials, blocked, 100)
+                assertEquals("TIMEOUT", bounded.sync(modes).errorType)
+                assertFalse(blocked.busy.value)
+                assertEquals(before, dao.profile())
+                val owner = async(Dispatchers.IO) { MinifluxSyncRunner(backend, cache, credentials, blocked).sync(modes) }
+                withTimeout(5000) { while (!blocked.busy.value) delay(10) }
+                owner.cancelAndJoin()
+                assertFalse(blocked.busy.value)
+                withTimeout(1000) { backend.withRun(modes) { assertEquals(modes, it) } }
+                assertEquals(1, dao.entryCount())
+                assertEquals(1, dao.pending(profile.id).size)
+                assertEquals(1, dao.starPending(profile.id).size)
+                assertMutationScope()
+            } finally {
+                credentials.clearToken()
             }
         }
 

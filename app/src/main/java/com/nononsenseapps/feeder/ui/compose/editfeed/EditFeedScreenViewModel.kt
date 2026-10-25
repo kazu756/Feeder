@@ -126,6 +126,11 @@ class EditFeedScreenViewModel(
 
     fun saveAndRequestSync(action: (Long) -> Unit) =
         viewModelScope.launch {
+            if (repository.isMinifluxMain) {
+                val toast: com.nononsenseapps.feeder.util.ToastMaker by instance()
+                toast.makeToast(com.nononsenseapps.feeder.R.string.miniflux_main_local_only)
+                return@launch
+            }
             val feed =
                 repository.getFeed(feedId)
                     ?: Feed() // Feed was deleted while being edited?

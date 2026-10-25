@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.core.content.getSystemService
 import com.nononsenseapps.feeder.archmodel.Repository
 import com.nononsenseapps.feeder.sync.SyncRestClient
+import com.nononsenseapps.feeder.util.logDebug
 import org.kodein.di.DI
 import org.kodein.di.DIAware
 import org.kodein.di.android.closestDI
@@ -25,22 +26,30 @@ class SyncChainSendReadJob(
 
     private val syncClient: SyncRestClient by di.instance()
 
+    private val backendSync: BackendSyncCoordinator by instance()
+
     override val jobId: Int = params.jobId
 
     override suspend fun doWork() {
-        try {
-            Log.d(LOG_TAG, "Doing work")
-            syncClient
-                .markAsRead()
-                .onLeft {
-                    Log.e(
-                        LOG_TAG,
-                        "Error when sending readmarks ${it.code}, ${it.body}",
-                        it.throwable,
-                    )
-                }
-        } catch (e: Exception) {
-            Log.e(LOG_TAG, "Error when sending read marks", e)
+        backendSync.withCurrentRun { selected ->
+            if (selected.mode != com.nononsenseapps.feeder.archmodel.BackendMode.LOCAL_RSS) return@withCurrentRun
+
+            try {
+                logDebug(LOG_TAG, "Doing work")
+                syncClient
+                    .markAsRead()
+                    .onLeft {
+                        Log.e(
+                            LOG_TAG,
+                            "Error when sending readmarks ${it.code}, ${it.body}",
+                            it.throwable,
+                        )
+                    }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "Error when sending read marks", e)
+            }
         }
     }
 
@@ -50,6 +59,8 @@ class SyncChainSendReadJob(
 }
 
 fun runOnceSyncChainSendRead(di: DI) {
+    val modes: com.nononsenseapps.feeder.archmodel.BackendModeStore by di.instance()
+    if (modes.selection.value.mode != com.nononsenseapps.feeder.archmodel.BackendMode.LOCAL_RSS) return
     val repository: Repository by di.instance()
     val context: Application by di.instance()
 

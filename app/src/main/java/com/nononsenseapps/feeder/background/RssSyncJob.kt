@@ -36,26 +36,34 @@ class RssSyncJob(
 
     private val rssLocalSync: RssLocalSync by instance()
 
+    private val backendSync: BackendSyncCoordinator by instance()
+
     override val jobId: Int = params.jobId
 
     override suspend fun doWork() {
-        try {
-            val feedId = params.extras.getLong(ARG_FEED_ID, ID_UNSET)
-            val feedTag = params.extras.getString(ARG_FEED_TAG) ?: ""
-            val forceNetwork = params.extras.getBoolean(ARG_FORCE_NETWORK, false)
-            val minFeedAgeMinutes = params.extras.getInt(MIN_FEED_AGE_MINUTES, 5)
+        backendSync.withCurrentRun { selected ->
+            if (selected.mode != com.nononsenseapps.feeder.archmodel.BackendMode.LOCAL_RSS) return@withCurrentRun
 
-            rssLocalSync.syncFeeds(
-                feedId = feedId,
-                feedTag = feedTag,
-                forceNetwork = forceNetwork,
-                minFeedAgeMinutes = minFeedAgeMinutes,
-            )
-        } catch (e: Exception) {
-            Log.e("FeederFeedSyncer", "Failure during sync", e)
-        } finally {
-            // Send notifications for configured feeds
-            notify(context.applicationContext)
+            try {
+                val feedId = params.extras.getLong(ARG_FEED_ID, ID_UNSET)
+                val feedTag = params.extras.getString(ARG_FEED_TAG) ?: ""
+                val forceNetwork = params.extras.getBoolean(ARG_FORCE_NETWORK, false)
+                val minFeedAgeMinutes = params.extras.getInt(MIN_FEED_AGE_MINUTES, 5)
+
+                rssLocalSync.syncFeeds(
+                    feedId = feedId,
+                    feedTag = feedTag,
+                    forceNetwork = forceNetwork,
+                    minFeedAgeMinutes = minFeedAgeMinutes,
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("FeederFeedSyncer", "Failure during sync", e)
+            } finally {
+                // Send notifications for configured feeds
+                notify(context.applicationContext)
+            }
         }
     }
 

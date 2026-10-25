@@ -81,6 +81,11 @@ class SyncRestClientTest : DIAware {
                 getApplicationContext<FeederApplication>().getSharedPreferences("synctest", Context.MODE_PRIVATE)
             }
         bind<ApplicationCoroutineScope>() with singleton { ApplicationCoroutineScope() }
+        bind<com.nononsenseapps.feeder.archmodel.BackendModeStore>() with
+            singleton {
+                com.nononsenseapps.feeder.archmodel
+                    .BackendModeStore(instance())
+            }
         bind<Repository>() with singleton { Repository(di) }
         bind<FilePathProvider>() with
             singleton {
@@ -135,6 +140,32 @@ class SyncRestClientTest : DIAware {
 
         return Triple(syncRestClient, secretKey, syncRemote)
     }
+
+    @Test fun minifluxBlocksConfiguredSubscriptionAndReadChainWithoutDeletingConfiguration() =
+        runBlocking {
+            val (client, _, remote) = buildSyncRestClientWithMockServer()
+            val modes: com.nononsenseapps.feeder.archmodel.BackendModeStore by instance()
+            try {
+                modes.commit(
+                    com.nononsenseapps.feeder.archmodel
+                        .BackendSelection(com.nononsenseapps.feeder.archmodel.BackendMode.MINIFLUX, "a".repeat(64)),
+                )
+                client.getFeeds()
+                client.getRead()
+                client.getDevices()
+                client.sendUpdatedFeeds()
+                client.markAsRead()
+                client.create()
+                client.join("b".repeat(64), remote.secretKey)
+                assertEquals(0, server.requestCount)
+                assertEquals(remote, testDb.db.syncRemoteDao().getSyncRemote())
+            } finally {
+                modes.commit(
+                    com.nononsenseapps.feeder.archmodel
+                        .BackendSelection(),
+                )
+            }
+        }
 
     // -----------------------------------------------------------------------------------------
     // Test 1

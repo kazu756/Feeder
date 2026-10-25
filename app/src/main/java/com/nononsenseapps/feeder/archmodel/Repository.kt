@@ -27,7 +27,6 @@ import com.nononsenseapps.feeder.db.room.RemoteFeed
 import com.nononsenseapps.feeder.db.room.SyncDevice
 import com.nononsenseapps.feeder.db.room.SyncRemote
 import com.nononsenseapps.feeder.miniflux.MinifluxCacheStore
-import com.nononsenseapps.feeder.miniflux.MinifluxCredentialStore
 import com.nononsenseapps.feeder.miniflux.MinifluxMainSource
 import com.nononsenseapps.feeder.miniflux.MinifluxReadMutationStore
 import com.nononsenseapps.feeder.miniflux.MinifluxStarMutationStore
@@ -79,7 +78,7 @@ class Repository(
     private val minifluxReads: MinifluxReadMutationStore by instance()
     private val minifluxStars: MinifluxStarMutationStore by instance()
     private val minifluxSync: MinifluxUnifiedSync by instance()
-    private val minifluxCredentials: MinifluxCredentialStore by instance()
+    private val minifluxRunner: com.nononsenseapps.feeder.miniflux.MinifluxSyncRunner by instance()
     val mainBackendError = MutableStateFlow<String?>(null)
     val isMinifluxMain get() = backendSelection.value.mode == BackendMode.MINIFLUX
     private val minifluxCollapsedCategories = MutableStateFlow<Set<String>>(emptySet())
@@ -333,12 +332,11 @@ class Repository(
 
     fun refreshMinifluxMain() {
         if (minifluxSync.busy.value) return
-        val profileId = backendSelection.value.minifluxProfileId ?: return
+        val snapshot = backendSelection.value
+        if (snapshot.mode != BackendMode.MINIFLUX) return
         applicationCoroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val profile = minifluxCache.existingDatabase(profileId).cacheDao().profile() ?: error("Missing profile")
-                val token = minifluxCredentials.loadToken(profile.baseUrl) ?: error("Missing token")
-                val result = minifluxSync.syncPinned(profile.baseUrl, token, profileId)
+                val result = minifluxRunner.sync(snapshot)
                 if (result.errorType == "ALREADY_RUNNING") return@launch
                 mainBackendError.value =
                     if (result.overall in setOf(MinifluxUnifiedOverall.SUCCESS, MinifluxUnifiedOverall.NOTHING_TO_DO)) null else "Miniflux sync: ${result.errorType ?: result.overall.name}"

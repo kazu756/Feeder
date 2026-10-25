@@ -68,6 +68,11 @@ suspend fun importOpml(
     di: DI,
     uri: Uri,
 ) = withContext(Dispatchers.IO) {
+    val modes: com.nononsenseapps.feeder.archmodel.BackendModeStore by di.instance()
+    if (modes.selection.value.mode != com.nononsenseapps.feeder.archmodel.BackendMode.LOCAL_RSS) {
+        di.direct.instance<ToastMaker>().makeToast(R.string.miniflux_main_local_only)
+        return@withContext
+    }
     val opmlToRoom: OPMLParserHandler by di.instance()
     try {
         val time =

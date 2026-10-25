@@ -57,6 +57,10 @@ suspend fun notify(
     appContext: Context,
     updateSummaryOnly: Boolean = false,
 ) = withContext(Dispatchers.Default) {
+    val backendDi by closestDI(appContext)
+    val modes: com.nononsenseapps.feeder.archmodel.BackendModeStore by backendDi.instance()
+    if (modes.selection.value.mode != com.nononsenseapps.feeder.archmodel.BackendMode.LOCAL_RSS) return@withContext
+
     if (ContextCompat.checkSelfPermission(
             appContext,
             Manifest.permission.POST_NOTIFICATIONS,

@@ -7,7 +7,11 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationManagerCompat
 import com.nononsenseapps.feeder.base.DIAwareJobService
 import com.nononsenseapps.feeder.util.logDebug
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import org.kodein.di.instance
 
@@ -15,7 +19,10 @@ class FeederJobService : DIAwareJobService() {
     private val notificationManager: NotificationManagerCompat by instance()
 
     private val coroutineScope = BackgroundCoroutineScope()
-    private val jobs: MutableMap<Int, Job> = mutableMapOf()
+    private val jobs = java.util.concurrent.ConcurrentHashMap<Int, Job>()
+    private val modes: com.nononsenseapps.feeder.archmodel.BackendModeStore by instance()
+    private val coordinator: BackendSyncCoordinator by instance()
+    private val dispatcher: BackendSyncDispatcher by instance()
 
     /*
     This service executes each incoming job on a Handler running on
@@ -36,25 +43,29 @@ class FeederJobService : DIAwareJobService() {
         state any such requirements.
          */
 
+        val snapshot = modes.selection.value
+        val localOnly = params.jobId in setOf(BackgroundJobId.FULL_TEXT_SYNC.jobId, BackgroundJobId.SYNC_CHAIN_GET_UPDATES.jobId, BackgroundJobId.SYNC_CHAIN_SEND_READ.jobId)
+        if (localOnly && snapshot.mode != com.nononsenseapps.feeder.archmodel.BackendMode.LOCAL_RSS) return false
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             showNotificationIfNecessary(params)
         }
 
         return when (params.jobId) {
             BackgroundJobId.RSS_SYNC.jobId -> {
-                runJob(RssSyncJob(context = this, params = params))
+                runJob(RssSyncJob(context = this, params = params), snapshot, primary = true)
             }
             BackgroundJobId.RSS_SYNC_PERIODIC.jobId -> {
-                runJob(RssSyncJob(context = this, params = params))
+                runJob(RssSyncJob(context = this, params = params), snapshot, primary = true)
             }
             BackgroundJobId.FULL_TEXT_SYNC.jobId -> {
-                runJob(FullTextSyncJob(context = this, params = params))
+                runJob(FullTextSyncJob(context = this, params = params), snapshot)
             }
             BackgroundJobId.SYNC_CHAIN_GET_UPDATES.jobId -> {
-                runJob(SyncChainGetUpdatesJob(context = this, params = params))
+                runJob(SyncChainGetUpdatesJob(context = this, params = params), snapshot)
             }
             BackgroundJobId.SYNC_CHAIN_SEND_READ.jobId -> {
-                runJob(SyncChainSendReadJob(context = this, params = params))
+                runJob(SyncChainSendReadJob(context = this, params = params), snapshot)
             }
             BackgroundJobId.BLOCKLIST_UPDATE.jobId -> {
                 runJob(BlocklistUpdateJob(context = this, params = params))
@@ -82,16 +93,33 @@ class FeederJobService : DIAwareJobService() {
         return false
     }
 
-    private fun runJob(job: BackgroundJob): Boolean {
-        jobs[job.jobId] =
-            coroutineScope.launch {
-                job.doWork()
-                jobFinished(job.params, false)
-                jobs.remove(job.jobId)
+    private fun runJob(
+        job: BackgroundJob,
+        snapshot: com.nononsenseapps.feeder.archmodel.BackendSelection? = null,
+        primary: Boolean = false,
+    ): Boolean {
+        val work =
+            coroutineScope.launch(start = CoroutineStart.LAZY) {
+                try {
+                    when {
+                        snapshot == null -> job.doWork()
+                        primary -> dispatcher.sync(snapshot) { job.doWork() }
+                        else -> coordinator.withRun(snapshot) { job.doWork() }
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(LOG_TAG, "Background job failed", e)
+                }
             }
-
-        // True means we're doing work in a coroutine.
+        trackBackgroundJob(jobs, job.jobId, work) { jobFinished(job.params, false) }
+        work.start()
         return true
+    }
+
+    override fun onDestroy() {
+        coroutineScope.cancel()
+        super.onDestroy()
     }
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)

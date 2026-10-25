@@ -26,16 +26,24 @@ class SyncChainGetUpdatesJob(
     private val syncClient: SyncRestClient by instance()
     private val repository: Repository by instance()
 
+    private val backendSync: BackendSyncCoordinator by instance()
+
     override val jobId: Int = params.jobId
 
     override suspend fun doWork() {
-        try {
-            Log.d(LOG_TAG, "Doing work")
-            syncClient.getRead()
-            repository.applyRemoteReadMarks()
-            syncClient.getDevices()
-        } catch (e: Exception) {
-            Log.e(LOG_TAG, "Error when getting updates", e)
+        backendSync.withCurrentRun { selected ->
+            if (selected.mode != com.nononsenseapps.feeder.archmodel.BackendMode.LOCAL_RSS) return@withCurrentRun
+
+            try {
+                logDebug(LOG_TAG, "Doing work")
+                syncClient.getRead()
+                repository.applyRemoteReadMarks()
+                syncClient.getDevices()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "Error when getting updates", e)
+            }
         }
     }
 
@@ -45,6 +53,8 @@ class SyncChainGetUpdatesJob(
 }
 
 fun runOnceSyncChainGetUpdates(di: DI) {
+    val modes: com.nononsenseapps.feeder.archmodel.BackendModeStore by di.instance()
+    if (modes.selection.value.mode != com.nononsenseapps.feeder.archmodel.BackendMode.LOCAL_RSS) return
     val repository: Repository by di.instance()
     val context: Application by di.instance()
 

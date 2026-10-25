@@ -24,12 +24,18 @@ class FullTextSyncJob(
     override val di: DI by closestDI(context)
     private val fullTextParser: FullTextParser by instance()
 
+    private val backendSync: BackendSyncCoordinator by instance()
+
     override val jobId: Int = params.jobId
 
     override suspend fun doWork() {
-        Log.i(LOG_TAG, "Performing full text parse work")
-        fullTextParser.parseFullArticlesForMissing()
-        Log.i(LOG_TAG, "Finished full text parse work")
+        backendSync.withCurrentRun { selected ->
+            if (selected.mode != com.nononsenseapps.feeder.archmodel.BackendMode.LOCAL_RSS) return@withCurrentRun
+
+            Log.i(LOG_TAG, "Performing full text parse work")
+            fullTextParser.parseFullArticlesForMissing()
+            Log.i(LOG_TAG, "Finished full text parse work")
+        }
     }
 
     companion object {
@@ -41,6 +47,8 @@ fun runOnceFullTextSync(
     di: DI,
     triggeredByUser: Boolean,
 ) {
+    val modes: com.nononsenseapps.feeder.archmodel.BackendModeStore by di.instance()
+    if (modes.selection.value.mode != com.nononsenseapps.feeder.archmodel.BackendMode.LOCAL_RSS) return
     val repository: Repository by di.instance()
     val context: Application by di.instance()
     val jobScheduler: JobScheduler? = context.getSystemService()

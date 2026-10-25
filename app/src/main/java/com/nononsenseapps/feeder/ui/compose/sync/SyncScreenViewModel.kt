@@ -86,6 +86,7 @@ class SyncScreenViewModel(
     }
 
     fun updateDeviceList() {
+        if (repository.isMinifluxMain) return
         applicationCoroutineScope.launch {
             logDebug(tag = LOG_TAG, "Update Devices")
             repository
@@ -100,6 +101,13 @@ class SyncScreenViewModel(
         syncCode: String,
         secretKey: String,
     ) {
+        if (repository.isMinifluxMain) {
+            viewModelScope.launch {
+                val toast: com.nononsenseapps.feeder.util.ToastMaker by instance()
+                toast.makeToast(R.string.miniflux_main_local_only)
+            }
+            return
+        }
         logDebug(tag = LOG_TAG, "Joining sync chain")
         viewModelScope.launch {
             try {
@@ -151,6 +159,13 @@ class SyncScreenViewModel(
     }
 
     fun startNewSyncChain() {
+        if (repository.isMinifluxMain) {
+            viewModelScope.launch {
+                val toast: com.nononsenseapps.feeder.util.ToastMaker by instance()
+                toast.makeToast(R.string.miniflux_main_local_only)
+            }
+            return
+        }
         applicationCoroutineScope.launch {
             try {
                 repository

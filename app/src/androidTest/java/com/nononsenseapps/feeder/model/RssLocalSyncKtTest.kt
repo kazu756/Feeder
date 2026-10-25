@@ -99,6 +99,11 @@ class RssLocalSyncKtTest : DIAware {
                 )
             }
         bind<ApplicationCoroutineScope>() with singleton { ApplicationCoroutineScope() }
+        bind<com.nononsenseapps.feeder.archmodel.BackendModeStore>() with
+            singleton {
+                com.nononsenseapps.feeder.archmodel
+                    .BackendModeStore(instance())
+            }
         bind<Repository>() with singleton { Repository(di) }
         bind<FilePathProvider>() with
             singleton {

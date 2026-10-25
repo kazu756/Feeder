@@ -528,11 +528,11 @@
     <string name="backend_local">FeederD (traditional)</string>
     <string name="backend_miniflux">Miniflux (experimental)</string>
     <string name="backend_local_description">FeederD fetches RSS feeds on this device.</string>
-    <string name="backend_foundation_note">Miniflux mode uses its cached articles on the main screen. Background RSS fetching and Sync Chain still run in this phase. Subscription management and Reader extras require Local RSS mode.</string>
+    <string name="backend_foundation_note">Miniflux mode syncs from Miniflux using the existing sync schedule. Normal on-device RSS fetching and Sync Chain stop. A run already started may finish. RSS data is retained; the widget remains Local RSS only.</string>
     <string name="backend_checking">Checking…</string>
     <string name="backend_confirm_title">Change article source setting?</string>
-    <string name="backend_confirm_miniflux">Check the connection and cache, then use Miniflux on the main screen. Existing RSS data, Miniflux cache and pending changes are retained. Background RSS processing still runs.</string>
-    <string name="backend_confirm_local">Return the setting to FeederD. Miniflux cache and pending changes are retained.</string>
+    <string name="backend_confirm_miniflux">Use Miniflux as the sync source. Normal RSS fetching on this device and Sync Chain stop from the next run. Existing Local RSS data, Miniflux cache and pending changes are retained.</string>
+    <string name="backend_confirm_local">Resume on-device RSS fetching and Sync Chain from the next scheduled or manual sync. Saved RSS articles are shown immediately. Miniflux cache and pending changes are retained.</string>
     <string name="backend_use_miniflux">Switch to Miniflux</string>
     <string name="backend_use_local">Return to FeederD</string>
     <string name="backend_changed">Saved: %1$s</string>
@@ -545,4 +545,5 @@
     <string name="backend_busy">Another source change is being checked.</string>
     <string name="backend_cancelled">Cancelled. The current setting was retained.</string>
     <string name="miniflux_main_local_only">This feature is available in Local RSS mode. Miniflux subscription management and Reader extras are not supported yet.</string>
+    <string name="widget_local_rss_only">Local RSS widget — refresh is paused in Miniflux mode.</string>
 </resources>

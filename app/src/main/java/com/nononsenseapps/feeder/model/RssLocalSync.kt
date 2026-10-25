@@ -52,6 +52,7 @@ val syncMutex = Mutex()
 class RssLocalSync(
     override val di: DI,
 ) : DIAware {
+    private val backendSync: com.nononsenseapps.feeder.background.BackendSyncCoordinator by instance()
     private val repository: Repository by instance()
     private val syncClient: SyncRestClient by instance()
     private val feedParser: FeedParser by instance()
@@ -68,21 +69,24 @@ class RssLocalSync(
         debugReallyForceNetwork: Boolean = false,
     ): Boolean {
         logDebug(LOG_TAG, "${Thread.currentThread().name}: Taking sync mutex")
-        return syncMutex.withLock {
-            withContext(singleThreadedSync) {
-                try {
-                    repository.setSyncWorkerRunning(true)
+        return backendSync.withCurrentRun { selection ->
+            if (selection.mode != com.nononsenseapps.feeder.archmodel.BackendMode.LOCAL_RSS) return@withCurrentRun false
+            syncMutex.withLock {
+                withContext(singleThreadedSync) {
+                    try {
+                        repository.setSyncWorkerRunning(true)
 
-                    syncFeeds(
-                        feedId = feedId,
-                        feedTag = feedTag,
-                        maxFeedItemCount = repository.maximumCountPerFeed.value,
-                        forceNetwork = forceNetwork,
-                        minFeedAgeMinutes = minFeedAgeMinutes,
-                        debugReallyForceNetwork = debugReallyForceNetwork,
-                    )
-                } finally {
-                    repository.setSyncWorkerRunning(false)
+                        syncFeeds(
+                            feedId = feedId,
+                            feedTag = feedTag,
+                            maxFeedItemCount = repository.maximumCountPerFeed.value,
+                            forceNetwork = forceNetwork,
+                            minFeedAgeMinutes = minFeedAgeMinutes,
+                            debugReallyForceNetwork = debugReallyForceNetwork,
+                        )
+                    } finally {
+                        repository.setSyncWorkerRunning(false)
+                    }
                 }
             }
         }
@@ -97,6 +101,7 @@ class RssLocalSync(
         // Used in tests to force network without having to wait
         debugReallyForceNetwork: Boolean = false,
     ): Boolean {
+        if (!backendSync.allowsLocalRss()) return false
         var result = false
         var needFullTextSync = false
         // Let all new items share download time
@@ -168,10 +173,12 @@ class RssLocalSync(
 
                         result = true
                     }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Throwable) {
                     Log.e(LOG_TAG, "Outer error", e)
                 } finally {
-                    if (needFullTextSync) {
+                    if (needFullTextSync && kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]?.isActive != false) {
                         runOnceFullTextSync(
                             di = di,
                             triggeredByUser = false,

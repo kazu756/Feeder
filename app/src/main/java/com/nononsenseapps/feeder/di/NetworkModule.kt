@@ -36,6 +36,22 @@ val networkModule =
         bind<MinifluxReadSync>() with singleton { MinifluxReadSync(instance(), instance(), instance()) }
         bind<MinifluxStarMutationStore>() with singleton { MinifluxStarMutationStore(instance()) }
         bind<MinifluxStarSync>() with singleton { MinifluxStarSync(instance(), instance(), instance()) }
+        bind<com.nononsenseapps.feeder.background.BackendSyncCoordinator>() with
+            singleton {
+                val modes: com.nononsenseapps.feeder.archmodel.BackendModeStore = instance()
+                com.nononsenseapps.feeder.background
+                    .BackendSyncCoordinator { modes.selection.value }
+            }
+        bind<com.nononsenseapps.feeder.miniflux.MinifluxSyncRunner>() with
+            singleton {
+                com.nononsenseapps.feeder.miniflux
+                    .MinifluxSyncRunner(instance(), instance(), instance(), instance())
+            }
+        bind<com.nononsenseapps.feeder.background.BackendSyncDispatcher>() with
+            singleton {
+                com.nononsenseapps.feeder.background
+                    .BackendSyncDispatcher(instance(), instance())
+            }
         bind<MinifluxUnifiedSync>() with singleton { MinifluxUnifiedSync(instance(), instance(), instance(), instance(), instance()) }
         bind<MinifluxApiClient>() with singleton { MinifluxApiClient() }
         bind<MinifluxCredentialStore>() with singleton { MinifluxCredentialStore(instance<Application>()) }
